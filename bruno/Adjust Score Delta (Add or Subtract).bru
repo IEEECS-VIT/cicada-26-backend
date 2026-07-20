@@ -1,0 +1,22 @@
+meta {
+  name: Adjust Score Delta (Add or Subtract)
+  type: http
+  seq: 2
+}
+
+patch {
+  url: http://localhost:5000/api/leaderboard/CyberKnights/adjust
+  body: json
+  auth: none
+}
+
+headers {
+  x-admin-key: sb_secret_PDPDEMJYJko0s5Bg7fP_GQ_hO5TgW09
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "delta": 5
+  }
+}

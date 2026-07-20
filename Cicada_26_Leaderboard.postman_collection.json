@@ -1,0 +1,115 @@
+{
+  "info": {
+    "name": "Cicada 26 Leaderboard API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Live Leaderboard Snapshot",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:5000/api/leaderboard",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["api", "leaderboard"]
+        }
+      }
+    },
+    {
+      "name": "Set Any Score (by Team Name)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "x-admin-key", "value": "sb_secret_PDPDEMJYJko0s5Bg7fP_GQ_hO5TgW09", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"team_name\": \"CyberKnights\",\n  \"challenges_completed\": 15\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5000/api/leaderboard/submit",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["api", "leaderboard", "submit"]
+        }
+      }
+    },
+    {
+      "name": "Adjust Score Delta (Add or Subtract)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "x-admin-key", "value": "sb_secret_PDPDEMJYJko0s5Bg7fP_GQ_hO5TgW09", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"delta\": 5\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5000/api/leaderboard/CyberKnights/adjust",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["api", "leaderboard", "CyberKnights", "adjust"]
+        }
+      }
+    },
+    {
+      "name": "Update Team Details (by ID)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "x-admin-key", "value": "sb_secret_PDPDEMJYJko0s5Bg7fP_GQ_hO5TgW09", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"team_name\": \"RenamedTeam\",\n  \"challenges_completed\": 10\n}"
+        },
+        "url": {
+          "raw": "http://localhost:5000/api/leaderboard/TEAM_ID_HERE",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["api", "leaderboard", "TEAM_ID_HERE"]
+        }
+      }
+    },
+    {
+      "name": "Delete Team Entry",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "x-admin-key", "value": "sb_secret_PDPDEMJYJko0s5Bg7fP_GQ_hO5TgW09", "type": "text" }
+        ],
+        "url": {
+          "raw": "http://localhost:5000/api/leaderboard/CyberKnights",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["api", "leaderboard", "CyberKnights"]
+        }
+      }
+    },
+    {
+      "name": "Live Stream SSE",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:5000/api/leaderboard/stream",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "5000",
+          "path": ["api", "leaderboard", "stream"]
+        }
+      }
+    }
+  ]
+}
