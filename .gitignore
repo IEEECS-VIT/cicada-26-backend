@@ -1,22 +1,5 @@
-# Dependencies
 node_modules/
-.pnpm-store/
-
-# Build Output
 dist/
-build/
-
-# Environment Variables
 .env
-.env.local
-.env.production
-
-# Logs
-*.log
-logs/
-
-# IDE / OS
-.vscode/
-.idea/
 .DS_Store
-Thumbs.db
+*.log

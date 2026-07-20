@@ -1,0 +1,19 @@
+meta {
+  name: 05_Update_Team_Name
+  type: http
+  seq: 5
+}
+
+post {
+  url: http://localhost:3000/api/teams/update-name
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "user_id": "REPLACE_WITH_LEADER_USER_ID",
+    "team_id": "REPLACE_WITH_TEAM_ID",
+    "new_team_name": "Alpha Team Renamed"
+  }
+}
