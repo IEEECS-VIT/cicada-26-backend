@@ -116,7 +116,7 @@ app.post('/api/teams/join', async (req: Request, res: Response) => {
     if (!user) throw new Error('User not found.');
     if (user.team_id) throw new Error('You are already in a team. You cannot join another one.');
 
-    const team = await db.teams.findByInviteCode(inviteCode.toUpperCase());
+    const team = await db.teams.findByInviteCode(invite_code.toUpperCase());
     if (!team) throw new Error('Invalid invite code.');
 
     const membersCount = await db.teams.countMembers(team.id);
