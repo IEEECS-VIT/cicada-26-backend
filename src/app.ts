@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import leaderboardRoutes from './routes/leaderboardRoutes.js';
+import challengeRoutes from './routes/challengeRoutes.js';
 
 const app: Express = express();
 
@@ -17,12 +18,13 @@ app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({
     status: 'UP',
     timestamp: new Date().toISOString(),
-    service: 'Cicada-26 Leaderboard API',
+    service: 'Cicada-26 Leaderboard & Challenge API',
   });
 });
 
 // API Routes
 app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/challenges', challengeRoutes);
 
 // 404 Handler
 app.use((req: Request, res: Response) => {

@@ -1,82 +1,79 @@
 ![ieeecs-template-header](https://github.com/user-attachments/assets/c3c40c85-51a2-4a5e-82a4-c32a0223e336)
 
-<h1 align="center">Cicada '26 Backend - Live Leaderboard API</h1>
+<h1 align="center">Cicada '26 Backend System</h1>
 
-<h4 align="center">High-performance Express + TypeScript API featuring a modular database repository architecture with Supabase integration.</h4>
-
----
-
-## 📌 Overview
-
-The **Cicada '26 Backend** provides a robust, real-time Live Leaderboard service for managing team rankings during the **Cicada '26** competition.
-
-### Core Features:
-- 🏆 **Live Leaderboard**: Automatic real-time team ranking based on contest rules:
-  1. **Challenges Solved** (`DESC` - Highest completed count wins)
-  2. **Completion Time** (`ASC` - Earliest completion / lowest time taken breaks ties)
-- 🧩 **Modular Database Architecture**: Fully decoupled Repository Pattern (`ILeaderboardRepository`). All Supabase code is completely isolated inside `src/database/supabase/`. If you ever migrate away from Supabase to raw PostgreSQL, Prisma, Drizzle, or MongoDB, you can simply swap out the repository implementation without touching your business logic or controllers!
-- ⚡ **Supabase Integration**: Isolated database adapter with PostgreSQL views, triggers, and Row Level Security (RLS).
-- 📡 **Realtime Streaming (SSE)**: Built-in Server-Sent Events (SSE) `/api/leaderboard/stream` endpoint for sub-second live updates to clients & admin dashboards.
-- 🔐 **Admin Management**: Secure admin endpoints (`x-admin-key` header) to manually override team scores, adjust points with delta increments, update entries, or delete teams.
-- 🧪 **API Testing Ready**: Comes pre-configured with Bruno collections and Postman collection files for instant API testing.
+<h4 align="center">Enterprise Express and TypeScript Service Architecture for Live Leaderboard and Challenge Engine Operations.</h4>
 
 ---
 
-## 🏗️ Architecture & Technology Stack
+## Overview
 
-| Layer | Technology Used | Description |
+The **Cicada '26 Backend** is a production-ready application server designed to manage competitive telemetry, live leaderboard rankings, and challenge progression during the Cicada '26 event.
+
+### Key Capabilities
+
+- **Live Leaderboard Service**: Dynamic calculation and real-time rank determination based on:
+  1. **Challenges Completed** (Descending order)
+  2. **Completion Time** (Ascending order)
+- **Repository Architecture**: Implements an isolated repository pattern (`ILeaderboardRepository` and `IChallengeRepository`). All database access is encapsulated within `src/database/supabase/`, allowing clean database engine migrations without impacting core business logic or controller handlers.
+- **Challenge and Story Engine**: Manages challenge sequencing, story fragment progression, multi-format media asset payloads (Images, PDFs, Audio, Video, Files, Text), case-insensitive response verification, and progress tracking.
+- **Real-Time Data Streaming**: Provides Server-Sent Events (SSE) via `/api/leaderboard/stream` to push updates instantly to connected clients and administrative consoles.
+- **Access Control & Administration**: Implements key-based authentication (`x-admin-key`) for administrative operations including manual score overrides, delta adjustments, and challenge configuration.
+
+---
+
+## Technical Stack
+
+| Component | Technology | Description |
 | :--- | :--- | :--- |
-| **Backend Runtime** | Node.js (v24+) | High performance JavaScript runtime |
-| **Framework** | Express.js | Lightweight web application framework |
-| **Language** | TypeScript (v5.8) | Type-safe code with strict mode |
-| **Database Architecture** | Repository Pattern | Decoupled DB abstraction layer (`ILeaderboardRepository`) |
-| **Database Provider** | Supabase (PostgreSQL) | Isolated in `src/database/supabase/` |
-| **Validation** | Zod (v3.24) | Strict runtime schema validation for request payloads |
-| **API Client Tool** | Bruno & Postman | Collection files included in repository |
+| **Runtime Engine** | Node.js (v24+) | Server-side JavaScript runtime environment |
+| **Web Framework** | Express.js (v4.21) | Application routing and HTTP middleware pipeline |
+| **Language** | TypeScript (v5.8) | Strongly-typed compilation target |
+| **Data Layer** | Repository Pattern | Decoupled persistence interface architecture |
+| **Database Platform** | Supabase (PostgreSQL) | Persistence layer with RLS, triggers, and views |
+| **Validation** | Zod (v3.24) | Runtime request schema parsing |
 
 ---
 
-## 📁 Project Structure
+## Repository Structure
 
-```bash
+```
 Cicada-26-Backend/
-├── bruno/                                           # Bruno API Collection
+├── bruno/                                           # API Testing Collection
 ├── database/
 │   └── supabase/
-│       └── supabase_setup.sql                       # Supabase SQL database migration script
+│       └── supabase_setup.sql                       # Database schema and setup migration script
 ├── src/
-│   ├── database/                                    # Isolated Database Abstraction Layer
-│   │   ├── interfaces/
-│   │   │   └── leaderboardRepository.ts            # Abstract DB repository interface
-│   │   └── supabase/                               # Supabase Provider Module
-│   │       ├── supabaseClient.ts                    # Supabase SDK client setup
-│   │       └── supabaseLeaderboardRepository.ts     # Supabase DB queries & CDC subscriptions
-│   ├── config/
-│   │   └── supabase.ts                              # Re-exports Supabase client
-│   ├── controllers/
-│   │   └── leaderboardController.ts                 # Request handlers & Zod validation
-│   ├── middleware/
-│   │   └── authMiddleware.ts                        # Admin x-admin-key authentication
-│   ├── routes/
-│   │   └── leaderboardRoutes.ts                     # API routes definition
-│   ├── services/
-│   │   └── leaderboardService.ts                    # Business logic (uses repository interface)
-│   ├── types/
-│   │   └── leaderboard.ts                           # TypeScript interfaces & DTOs
-│   ├── app.ts                                       # Express app configuration
-│   └── server.ts                                    # Server entry point
-├── .env.example                                     # Environment variables template
-├── API_ROUTES.md                                    # Comprehensive API routes documentation
-├── Cicada_26_Leaderboard.postman_collection.json    # Postman/Bruno collection
-├── package.json                                     # Scripts and dependencies
+│   ├── database/                                    # Database abstraction layer
+│   │   ├── interfaces/                              # Repository interfaces
+│   │   │   ├── challengeRepository.ts
+│   │   │   └── leaderboardRepository.ts
+│   │   └── supabase/                               # Supabase implementation adapters
+│   │       ├── supabaseChallengeRepository.ts
+│   │       ├── supabaseClient.ts
+│   │       └── supabaseLeaderboardRepository.ts
+│   ├── config/                                      # Application configuration
+│   ├── controllers/                                 # Request handling and schema validation
+│   ├── middleware/                                  # Authentication and authorization middleware
+│   ├── routes/                                      # Express route handlers
+│   ├── services/                                    # Business logic workflows
+│   ├── types/                                       # Domain entity and DTO definitions
+│   ├── app.ts                                       # Express application configuration
+│   └── server.ts                                    # Application startup entry point
+├── API_ROUTES.md                                    # Comprehensive API reference documentation
+├── CODE_OF_CONDUCT.md                               # Project code of conduct
+├── CONTRIBUTING.md                                  # Contribution guidelines
+├── package.json                                     # Package dependencies and operational scripts
 └── tsconfig.json                                    # TypeScript compiler configuration
 ```
 
 ---
 
-## ⚙️ Setup Instructions
+## Setup and Configuration
 
-### 1. Clone & Install Dependencies
+### 1. Installation
+
+Clone the repository and install dependencies:
 
 ```bash
 git clone <repository-url>
@@ -84,40 +81,44 @@ cd Cicada-26-Backend
 npm install
 ```
 
-### 2. Configure Environment Variables
+### 2. Environment Configuration
 
-Create a `.env` file in the root directory:
+Create a `.env` file in the root directory following the structure defined in `.env.example`:
 
 ```env
-# Server Configuration
+# Server Environment
 PORT=5000
 NODE_ENV=development
 
-# Supabase Credentials (from Supabase Dashboard -> Project Settings -> API Keys)
+# Supabase Credentials
 SUPABASE_URL=https://fdzcrmwwjpfwntbakied.supabase.co
 SUPABASE_ANON_KEY=your_supabase_anon_key_here
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key_here
 
-# Admin Authentication Secret
-ADMIN_API_KEY=sb_secret_PDPDEMJYJko0s5Bg7fP_GQ_hO5TgW09
+# Administration Security Secret
+ADMIN_API_KEY=your_admin_secret_key_here
 ```
 
-### 3. Run Supabase Database Migration
+### 3. Database Migration
 
-1. Open your Supabase Dashboard: [https://supabase.com/dashboard/project/fdzcrmwwjpfwntbakied](https://supabase.com/dashboard/project/fdzcrmwwjpfwntbakied)
-2. Go to **SQL Editor** (`>_`).
-3. Copy the contents of [`database/supabase/supabase_setup.sql`](file:///c:/Users/SHIKHAR%20PANDEY/Desktop/Cicada-26-Backend/database/supabase/supabase_setup.sql) and click **Run**.
+Execute the script [`database/supabase/supabase_setup.sql`](file:///c:/Users/SHIKHAR%20PANDEY/Desktop/Cicada-26-Backend/database/supabase/supabase_setup.sql) in your Supabase SQL Console. This script provisions:
+- `public.leaderboard` table and `public.live_leaderboard` ranking view
+- `public.challenges` table with story fragment support
+- `public.team_progress` tracking table
+- Row Level Security (RLS) policies and update triggers
 
 ---
 
-## 🚀 Running the Project
+## Execution Instructions
 
-### Development Mode (with hot-reload)
+### Development Server
+Run the local development server with automatic file watching:
 ```bash
 npm run dev
 ```
 
-### Build & Run Production Server
+### Production Build and Execution
+Compile TypeScript source files and start the production server:
 ```bash
 npm run build
 npm start
@@ -125,6 +126,6 @@ npm start
 
 ---
 
-## 🟢 Project Status
+## Compliance and Licensing
 
-- 🟢 **Completed & Operational**
+This repository complies with organizational engineering guidelines and governance standards. Refer to `CONTRIBUTING.md` and `LICENSE` for details.

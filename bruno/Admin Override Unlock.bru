@@ -1,11 +1,11 @@
 meta {
-  name: Set Any Score (by Team Name)
+  name: Admin Override Unlock
   type: http
-  seq: 1
+  seq: 12
 }
 
 post {
-  url: http://localhost:5000/api/leaderboard/submit
+  url: http://localhost:5000/api/challenges/admin/override
   body: json
   auth: none
 }
@@ -17,7 +17,7 @@ headers {
 
 body:json {
   {
-    "team_name": "labhesh bhaiya ki jai2",
-    "challenges_completed": 15
+    "team_name": "CyberKnights",
+    "target_challenge_order": 3
   }
 }
