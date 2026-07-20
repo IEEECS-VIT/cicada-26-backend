@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  @page { margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 2cm;
+    color: #333;
+  }
+  h1 { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; }
+  h2 { margin-top: 30px; color: #222; }
+  p.desc { font-style: italic; color: #555; margin-bottom: 15px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 30px;
+  }
+  th, td {
+    border: 2px solid #000;
+    padding: 12px;
+    text-align: left;
+    font-size: 14px;
+  }
+  th {
+    background-color: #f0f0f0;
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+  <h1>Cicada 2067 - Database Schema (PostgreSQL)</h1>
+
+  <h2>1. users</h2>
+  <p class="desc">Single unified table serving as the pre-authorized whitelist and user profile. Supabase Auth will use a PostgreSQL Trigger to verify the email against this table before allowing login.</p>
+  <table>
+    <tr>
+      <th>id (UUID)</th>
+      <th>email (VARCHAR)</th>
+      <th>display_name (VARCHAR)</th>
+      <th>role (ENUM)</th>
+      <th>team_id (UUID)</th>
+      <th>joined_team_at (TIMESTAMPTZ)</th>
+      <th>created_at (TIMESTAMPTZ)</th>
+    </tr>
+    <tr>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>participant / admin</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+    </tr>
+  </table>
+
+  <h2>2. teams</h2>
+  <p class="desc">Created by a Team Leader. Generates a unique invite code for members (Max 5 per team).</p>
+  <table>
+    <tr>
+      <th>id (UUID)</th>
+      <th>name (VARCHAR)</th>
+      <th>leader_id (UUID)</th>
+      <th>invite_code (VARCHAR)</th>
+      <th>current_round (INT)</th>
+      <th>current_challenge_id (UUID)</th>
+      <th>challenges_completed (INT)</th>
+      <th>total_time_taken (INT)</th>
+      <th>is_disqualified (BOOL)</th>
+    </tr>
+    <tr>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+    </tr>
+  </table>
+
+  <h2>3. challenges</h2>
+  <p class="desc">Unified challenges table holding the actual puzzles, storylines, and assets across all rounds.</p>
+  <table>
+    <tr>
+      <th>id (UUID)</th>
+      <th>round_number (INT)</th>
+      <th>sequence_number (INT)</th>
+      <th>title (VARCHAR)</th>
+      <th>story_context (TEXT)</th>
+      <th>embedded_assets (JSONB)</th>
+      <th>answer (VARCHAR)</th>
+      <th>unlocks_story_fragment (TEXT)</th>
+    </tr>
+    <tr>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+    </tr>
+  </table>
+
+  <h2>4. submission_logs</h2>
+  <p class="desc">Critical for admin tracking, analytics, and resolving disputes.</p>
+  <table>
+    <tr>
+      <th>id (UUID)</th>
+      <th>team_id (UUID)</th>
+      <th>user_id (UUID)</th>
+      <th>challenge_id (UUID)</th>
+      <th>submitted_answer (VARCHAR)</th>
+      <th>is_correct (BOOL)</th>
+      <th>submitted_at (TIMESTAMPTZ)</th>
+    </tr>
+    <tr>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+    </tr>
+  </table>
+
+  <h2>5. system_config</h2>
+  <p class="desc">Global State for Admin God-Mode (e.g. pause rounds, lock system).</p>
+  <table>
+    <tr>
+      <th>key (VARCHAR)</th>
+      <th>value (JSONB)</th>
+      <th>updated_at (TIMESTAMPTZ)</th>
+    </tr>
+    <tr>
+      <td>(empty)</td>
+      <td>(empty)</td>
+      <td>(empty)</td>
+    </tr>
+  </table>
+
+  <h2 style="page-break-before: always;">Core Security & Role Segregation (Supabase RLS)</h2>
+  <p class="desc">Supabase utilizes Row Level Security (RLS) directly on the PostgreSQL database to ensure absolute security. Roles are defined by the role ENUM of the users table.</p>
+  <ul>
+    <li><strong>Participant Privileges (role = 'participant')</strong>
+      <ul>
+        <li><code>users</code>: Can SELECT their own row and rows of users with the same team_id.</li>
+        <li><code>teams</code>: Can SELECT their own team. Can UPDATE only if they are the leader_id.</li>
+        <li><code>challenges</code>: Can SELECT only the challenge where id = team.current_challenge_id. Cannot see future challenges.</li>
+        <li><code>submission_logs</code>: Can INSERT a submission. Cannot SELECT logs to prevent reverse engineering.</li>
+        <li><strong>Answers</strong>: The answer column is NEVER sent to the frontend. Validation occurs entirely via backend secure functions.</li>
+      </ul>
+    </li>
+    <br/>
+    <li><strong>Administrator Privileges (role = 'admin')</strong>
+      <ul>
+        <li><strong>Full Access:</strong> Admins completely bypass RLS policies. They have unrestricted SELECT, INSERT, UPDATE, and DELETE access to all tables.</li>
+        <li><strong>God-Mode:</strong> Can manually modify teams.current_challenge_id to skip puzzles.</li>
+        <li><strong>Global Configuration:</strong> Can modify system_config to pause the timer globally or lock out submissions.</li>
+        <li><strong>Analytics:</strong> Can query the entire submission_logs table for real-time leaderboards.</li>
+      </ul>
+    </li>
+  </ul>
+
+</body>
+</html>
