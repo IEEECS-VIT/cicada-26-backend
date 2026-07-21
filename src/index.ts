@@ -1,9 +1,9 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import db from './db';
+import db, { supabase } from './db';
 import { v4 as uuidv4 } from 'uuid';
-
+import bcrypt from 'bcrypt';
 dotenv.config();
 
 const app = express();
@@ -37,8 +37,24 @@ app.post('/api/dev/seed-user', async (req: Request, res: Response) => {
 });
 
 app.post('/api/auth/verify-login', async (req: Request, res: Response) => {
-  const { email, google_display_name } = req.body;
+  const { access_token } = req.body;
   try {
+    if (!access_token) {
+      return res.status(400).json({ success: false, error: 'Missing access_token.' });
+    }
+
+    // 1. Cryptographically verify the token with Supabase
+    const { data: { user: authUser }, error } = await supabase.auth.getUser(access_token);
+    
+    if (error || !authUser || !authUser.email) {
+      return res.status(401).json({ success: false, error: 'Invalid or expired Google Auth token.' });
+    }
+
+    // Extract real data directly from the encrypted token payload
+    const email = authUser.email;
+    const google_display_name = authUser.user_metadata?.full_name || authUser.user_metadata?.name || '';
+
+    // 2. Check Whitelist
     const user = await db.users.findByEmail(email);
     
     if (!user) {
@@ -48,6 +64,7 @@ app.post('/api/auth/verify-login', async (req: Request, res: Response) => {
       });
     }
 
+    // 3. Update Display Name if empty
     if (!user.display_name && google_display_name) {
       await db.users.updateDisplayName(user.id, google_display_name);
       user.display_name = google_display_name;
@@ -99,7 +116,7 @@ app.post('/api/teams/join', async (req: Request, res: Response) => {
     if (!user) throw new Error('User not found.');
     if (user.team_id) throw new Error('You are already in a team. You cannot join another one.');
 
-    const team = await db.teams.findByInviteCode(inviteCode.toUpperCase());
+    const team = await db.teams.findByInviteCode(invite_code.toUpperCase());
     if (!team) throw new Error('Invalid invite code.');
 
     const membersCount = await db.teams.countMembers(team.id);
@@ -137,6 +154,62 @@ app.post('/api/teams/remove-member', async (req: Request, res: Response) => {
 
     await db.teams.removeMember(target_user_id, team_id);
     res.json({ success: true, message: 'Member removed successfully.' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
+// CHALLENGE SUBMISSION ROUTES
+// ==========================================
+
+app.post('/api/challenges/submit', async (req: Request, res: Response) => {
+  const { team_id, user_id, challenge_id, submitted_answer } = req.body;
+  try {
+    // 1. Validate team and user
+    const team = await db.teams.findById(team_id);
+    if (!team) return res.status(404).json({ success: false, error: 'Team not found.' });
+
+    const user = await db.users.findById(user_id);
+    if (!user || user.team_id !== team_id) return res.status(403).json({ success: false, error: 'User does not belong to this team.' });
+
+    // 2. Validate Challenge
+    const challenge = await db.challenges.findById(challenge_id);
+    if (!challenge) return res.status(404).json({ success: false, error: 'Challenge not found.' });
+
+    // 3. Verify Answer using Bcrypt
+    const isCorrect = await bcrypt.compare(submitted_answer, challenge.answer_hash);
+
+    // 4. Log the submission immutably (whether correct or not)
+    await db.submissionLogs.logSubmission(team_id, user_id, challenge_id, submitted_answer, isCorrect);
+
+    // 5. Update Delta Time Tracking
+    if (isCorrect) {
+      // Calculate delta time
+      const progress = await db.teamProgress.findByTeamId(team_id);
+      let deltaSeconds = 0;
+      if (progress && progress.opened_at) {
+        const openedAt = new Date(progress.opened_at).getTime();
+        const submittedAt = new Date().getTime();
+        deltaSeconds = Math.floor((submittedAt - openedAt) / 1000);
+      }
+
+      // Record the success attempt with time calculation
+      // For this implementation, we just pass undefined for the next challenge to avoid complexity, but it handles attempts
+      await db.teamProgress.recordAttempt(team_id, true, deltaSeconds);
+
+      return res.json({ 
+        success: true, 
+        message: 'Correct answer! Progress recorded.',
+        time_taken_seconds: deltaSeconds,
+        unlocks_story: challenge.unlocks_story_fragment 
+      });
+    } else {
+      // Record failure attempt
+      await db.teamProgress.recordAttempt(team_id, false);
+      return res.status(400).json({ success: false, error: 'Incorrect answer. Submission logged.' });
+    }
+
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
