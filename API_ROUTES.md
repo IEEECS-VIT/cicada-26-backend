@@ -1,39 +1,57 @@
-# 🚀 Cicada '26 - Backend API Routes Documentation
+# API Routes Documentation
 
-Complete API documentation for the **Cicada '26 Live Leaderboard System** backed by Supabase.
+Comprehensive API specification for the **Cicada '26 Leaderboard & Challenge Engine Services** backed by Supabase.
 
 ---
 
-## 🔐 Authentication & Access Control
+## Authentication and Access Control
 
-- **Public Endpoints**: Accessible without any headers.
-- **Admin Endpoints**: Require the `x-admin-key` header matching your `.env` secret:
+- **Public Endpoints**: Openly accessible without authentication headers.
+- **Administrative Endpoints**: Require the `x-admin-key` header matching the environment configuration:
   ```http
-  x-admin-key: your_admin_api_key_here
+  x-admin-key: <ADMIN_API_KEY>
   ```
 
 ---
 
-## 📊 Summary of API Endpoints
+## Summary of API Endpoints
 
-| Method | Endpoint | Access | Description |
+### 1. Leaderboard Endpoints
+
+| Method | Endpoint | Access Level | Description |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/health` | Public | Check backend API health status |
-| `GET` | `/api/leaderboard` | Public | Get ordered live leaderboard snapshot |
-| `GET` | `/api/leaderboard/stream` | Public | Server-Sent Events (SSE) live real-time stream |
-| `POST` | `/api/leaderboard/submit` | **Admin** | Set/submit score for any team directly by `team_name` |
-| `POST` | `/api/leaderboard/score` | **Admin** | Alias endpoint for score submission |
-| `PATCH` | `/api/leaderboard/:identifier/adjust` | **Admin** | Adjust score by adding/subtracting points (`delta`) by team name or ID |
-| `PUT` | `/api/leaderboard/:id` | **Admin** | Update team details by entry ID |
-| `DELETE` | `/api/leaderboard/:identifier` | **Admin** | Delete team entry by name or ID |
-| `POST` | `/api/leaderboard/reset` | **Admin** | Clear/reset all leaderboard entries |
+| `GET` | `/health` | Public | System health check and service status |
+| `GET` | `/api/leaderboard` | Public | Ordered live leaderboard snapshot |
+| `GET` | `/api/leaderboard/stream` | Public | Server-Sent Events (SSE) real-time streaming endpoint |
+| `POST` | `/api/leaderboard/submit` | Admin | Directly set score for any team by `team_name` |
+| `POST` | `/api/leaderboard/score` | Admin | Alias endpoint for setting team scores |
+| `PATCH` | `/api/leaderboard/:identifier/adjust` | Admin | Adjust team score using positive or negative point delta |
+| `PUT` | `/api/leaderboard/:id` | Admin | Modify team entry attributes by UUID |
+| `DELETE` | `/api/leaderboard/:identifier` | Admin | Delete team entry by name or UUID |
+| `POST` | `/api/leaderboard/reset` | Admin | Reset all leaderboard entries |
+
+### 2. Challenge and Story Engine Endpoints
+
+| Method | Endpoint | Access Level | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/challenges` | Public | Fetch active public challenges (optional `team_name` query for lock status) |
+| `GET` | `/api/challenges/:identifier` | Public | Fetch challenge details by order number or UUID |
+| `POST` | `/api/challenges/submit` | Public | Submit challenge response for validation and automated score sync |
+| `GET` | `/api/challenges/progress` | Public | Participant state recovery endpoint for post-logout session resume |
+| `GET` | `/api/challenges/story-fragments` | Public | Archive page: Retrieve all unlocked story fragments for a team |
+| `GET` | `/api/challenges/admin/progress` | Admin | Detailed progress tracking matrix across all teams |
+| `POST` | `/api/challenges/admin/override` | Admin | Force-unlock any challenge order for a specific team |
+| `GET` | `/api/challenges/admin/all` | Admin | Fetch all challenge records including answer keys |
+| `POST` | `/api/challenges/admin` | Admin | Create a new challenge record |
+| `PUT` | `/api/challenges/admin/:id` | Admin | Modify challenge attributes |
+| `DELETE` | `/api/challenges/admin/:id` | Admin | Delete a challenge record |
 
 ---
 
-## 📑 Detailed Endpoint Documentation
+## Detailed Endpoint Reference
 
 ### 1. Health Check
-Checks if the Express server and API services are running.
+Verifies service availability and operational readiness.
 
 - **Method**: `GET`
 - **Path**: `/health`
@@ -42,17 +60,17 @@ Checks if the Express server and API services are running.
   ```json
   {
     "status": "UP",
-    "timestamp": "2026-07-19T18:40:00.000Z",
-    "service": "Cicada-26 Leaderboard API"
+    "timestamp": "2026-07-20T18:40:00.000Z",
+    "service": "Cicada-26 Leaderboard & Challenge API"
   }
   ```
 
 ---
 
-### 2. Get Live Leaderboard Snapshot
-Returns the current leaderboard ordered according to contest rules:
-1. **Challenges Completed** (`DESC` - Highest first)
-2. **Completion Time** (`ASC` - Lowest time taken / earliest completion first)
+### 2. Live Leaderboard Snapshot
+Returns the current team rankings compiled according to evaluation criteria:
+1. **Challenges Solved** (`DESC` - Primary sorting)
+2. **Completion Time** (`ASC` - Secondary tie-breaking sorting)
 
 - **Method**: `GET`
 - **Path**: `/api/leaderboard`
@@ -67,19 +85,10 @@ Returns the current leaderboard ordered according to contest rules:
         "rank": 1,
         "id": "98f7151b-253c-4ee8-9c8a-3755eb41173c",
         "team_name": "CyberKnights",
-        "challenges_completed": 15,
-        "completion_time": "2026-07-19T11:46:32.511Z",
-        "created_at": "2026-07-19T12:01:32.511Z",
-        "updated_at": "2026-07-19T13:01:12.511Z"
-      },
-      {
-        "rank": 2,
-        "id": "f3b945f5-72d8-4693-a230-83d672134c4e",
-        "team_name": "AlphaTeam",
-        "challenges_completed": 8,
-        "completion_time": "2026-07-19T12:54:26.671Z",
-        "created_at": "2026-07-19T12:12:30.367Z",
-        "updated_at": "2026-07-19T12:54:25.858Z"
+        "challenges_completed": 5,
+        "completion_time": "2026-07-20T11:46:32.511Z",
+        "created_at": "2026-07-20T12:01:32.511Z",
+        "updated_at": "2026-07-20T13:01:12.511Z"
       }
     ]
   }
@@ -87,13 +96,13 @@ Returns the current leaderboard ordered according to contest rules:
 
 ---
 
-### 3. Real-Time Live Leaderboard Stream (SSE)
-Establishes a persistent Server-Sent Events (SSE) connection. Whenever an admin or challenge submission alters scores in Supabase, an update event is pushed instantly.
+### 3. Server-Sent Events (SSE) Live Stream
+Establishes a persistent streaming connection for real-time telemetry updates.
 
 - **Method**: `GET`
 - **Path**: `/api/leaderboard/stream`
 - **Headers**: `Accept: text/event-stream`
-- **Stream Event Output**:
+- **Event Output Format**:
   ```http
   data: {"event":"initial","leaderboard":[...]}
 
@@ -102,11 +111,183 @@ Establishes a persistent Server-Sent Events (SSE) connection. Whenever an admin 
 
 ---
 
-### 4. Set / Override Team Score (Admin)
-Sets any score for any team directly by `team_name`. Creates the team if it doesn't exist, or updates its completed challenges count to the exact number provided.
+### 4. Public Active Challenges
+Returns active challenges with associated story contexts and media payloads (Images, PDFs, Audio, Video, Files, Text). Answer keys are excluded.
+
+- **Method**: `GET`
+- **Path**: `/api/challenges`
+- **Query Parameters**: `team_name` (Optional - evaluates `is_locked` status per team)
+- **Response `200 OK`**:
+  ```json
+  {
+    "success": true,
+    "message": "Active challenges fetched successfully",
+    "data": [
+      {
+        "id": "7b587b1c-30b6-4b8a-8c6e-21a4f028442a",
+        "order_number": 1,
+        "name": "Archive 01: Transmission Beacon",
+        "story_context": "A hidden transmission was intercepted...",
+        "assets": [
+          { "type": "text", "content": "Signal Payload: 0x4369636164613236" },
+          { "type": "image", "url": "https://...", "name": "Beacon Spectrum Analysis" }
+        ],
+        "story_fragment": {
+          "title": "Recovered Mission Log",
+          "header": "Day 102",
+          "content": "Signal acquisition established."
+        },
+        "is_active": true,
+        "is_locked": false
+      }
+    ]
+  }
+  ```
+
+---
+
+### 5. Submit Challenge Response
+Validates participant input against challenge solution requirements.
+- Performs case-insensitive matching with leading and trailing whitespace trimming.
+- Enforces strict sequential challenge progression (blocks out-of-order attempts).
+- Automatically increments attempt telemetry, updates team progress, unlocks the next challenge, and updates live leaderboard metrics upon success.
 
 - **Method**: `POST`
-- **Path**: `/api/leaderboard/submit` (or `/api/leaderboard/score`)
+- **Path**: `/api/challenges/submit`
+- **Headers**: `Content-Type: application/json`
+- **Body**:
+  ```json
+  {
+    "team_name": "CyberKnights",
+    "challenge_identifier": 1,
+    "answer": "CICADA26_START"
+  }
+  ```
+- **Response `200 OK` (Valid Solution)**:
+  ```json
+  {
+    "success": true,
+    "message": "Correct answer! Next challenge unlocked automatically.",
+    "unlocked_next_challenge": 2,
+    "story_fragment": {
+      "title": "Recovered Mission Log",
+      "header": "Day 102",
+      "content": "Signal acquisition established."
+    }
+  }
+  ```
+- **Response `400 Bad Request` (Invalid Solution)**:
+  ```json
+  {
+    "success": false,
+    "message": "Incorrect Authentication Key",
+    "tryAgain": true
+  }
+  ```
+- **Response `400 Bad Request` (Out-of-Order Attempt)**:
+  ```json
+  {
+    "success": false,
+    "message": "Challenge locked. You must complete challenge 1 first before attempting challenge 2.",
+    "tryAgain": false
+  }
+  ```
+
+---
+
+### 6. Participant Session State Recovery
+Retrieves current progression metrics and unlocked story fragments to support seamless session resumption following logout.
+
+- **Method**: `GET`
+- **Path**: `/api/challenges/progress`
+- **Query Parameters**: `team_name` (Required)
+- **Response `200 OK`**:
+  ```json
+  {
+    "success": true,
+    "message": "Progress state for team 'CyberKnights' fetched successfully",
+    "data": {
+      "team_name": "CyberKnights",
+      "current_challenge_order": 2,
+      "completed_challenges": [1],
+      "challenges_solved": 1,
+      "unlocked_story_fragments": [
+        {
+          "challenge_order": 1,
+          "challenge_name": "Archive 01: Transmission Beacon",
+          "story_fragment": {
+            "title": "Recovered Mission Log",
+            "header": "Day 102",
+            "content": "Signal acquisition established."
+          }
+        }
+      ]
+    }
+  }
+  ```
+
+---
+
+### 7. Unlocked Story Fragments (Archive)
+Retrieves unlocked story fragments associated with solved challenges for display on the Archive page.
+
+- **Method**: `GET`
+- **Path**: `/api/challenges/story-fragments`
+- **Query Parameters**: `team_name` (Required)
+- **Response `200 OK`**:
+  ```json
+  {
+    "success": true,
+    "message": "Unlocked story fragments for team 'CyberKnights' fetched successfully",
+    "data": [
+      {
+        "challenge_order": 1,
+        "challenge_name": "Archive 01: Transmission Beacon",
+        "story_fragment": {
+          "title": "Recovered Mission Log",
+          "header": "Day 102",
+          "content": "Signal acquisition established."
+        }
+      }
+    ]
+  }
+  ```
+
+---
+
+### 8. Administrative Progress Tracking
+Provides comprehensive progress matrix across all participating teams.
+
+- **Method**: `GET`
+- **Path**: `/api/challenges/admin/progress`
+- **Headers**: `x-admin-key: <ADMIN_API_KEY>`
+- **Response `200 OK`**:
+  ```json
+  {
+    "success": true,
+    "message": "Admin team progress tracking summary fetched successfully",
+    "data": [
+      {
+        "team_name": "CyberKnights",
+        "current_challenge_order": 2,
+        "challenges_solved": 1,
+        "completion_time": "2026-07-20T12:00:00.000Z",
+        "attempts_count": 3,
+        "last_attempt_at": "2026-07-20T12:05:00.000Z",
+        "story_progress": "1 / 3 fragments unlocked",
+        "completed_challenges": [1]
+      }
+    ]
+  }
+  ```
+
+---
+
+### 9. Administrative Override Challenge Unlock
+Force-unlocks challenge progression for a target team.
+
+- **Method**: `POST`
+- **Path**: `/api/challenges/admin/override`
 - **Headers**:
   - `x-admin-key: <ADMIN_API_KEY>`
   - `Content-Type: application/json`
@@ -114,111 +295,74 @@ Sets any score for any team directly by `team_name`. Creates the team if it does
   ```json
   {
     "team_name": "CyberKnights",
-    "challenges_completed": 15,
-    "completion_time": "2026-07-19T13:00:00.000Z" // Optional timestamp
+    "target_challenge_order": 3
   }
   ```
 - **Response `200 OK`**:
   ```json
   {
     "success": true,
-    "message": "Score for team 'CyberKnights' set to 15 instantly",
-    "data": {
-      "rank": 1,
-      "id": "98f7151b-253c-4ee8-9c8a-3755eb41173c",
-      "team_name": "CyberKnights",
-      "challenges_completed": 15,
-      "completion_time": "2026-07-19T13:00:00.000Z"
-    }
+    "message": "Admin override successful. Team 'CyberKnights' unlocked up to challenge 3.",
+    "unlocked_next_challenge": 3
   }
   ```
 
 ---
 
-### 5. Adjust Score Delta (Admin)
-Adds or subtracts points (`delta`) for any team by `team_name` or `id`.
-
-- **Method**: `PATCH`
-- **Path**: `/api/leaderboard/:identifier/adjust` (e.g. `/api/leaderboard/CyberKnights/adjust`)
-- **Headers**:
-  - `x-admin-key: <ADMIN_API_KEY>`
-  - `Content-Type: application/json`
-- **Body**:
-  ```json
-  {
-    "delta": 5 // Use positive number to add points (+5), or negative to deduct (-2)
-  }
-  ```
-- **Response `200 OK`**:
-  ```json
-  {
-    "success": true,
-    "message": "Score for 'CyberKnights' adjusted by +5",
-    "data": {
-      "rank": 1,
-      "id": "98f7151b-253c-4ee8-9c8a-3755eb41173c",
-      "team_name": "CyberKnights",
-      "challenges_completed": 20
-    }
-  }
-  ```
-
----
-
-### 6. Update Team Details by ID (Admin)
-Updates specific fields of a team entry by its UUID.
-
-- **Method**: `PUT`
-- **Path**: `/api/leaderboard/:id`
-- **Headers**:
-  - `x-admin-key: <ADMIN_API_KEY>`
-  - `Content-Type: application/json`
-- **Body**:
-  ```json
-  {
-    "team_name": "CyberKnights Modified",
-    "challenges_completed": 22
-  }
-  ```
-- **Response `200 OK`**:
-  ```json
-  {
-    "success": true,
-    "message": "Team entry modified successfully in Supabase backend",
-    "data": { ... }
-  }
-  ```
-
----
-
-### 7. Delete Team (Admin)
-Removes a team entry from the leaderboard by `team_name` or `id`.
-
-- **Method**: `DELETE`
-- **Path**: `/api/leaderboard/:identifier` (e.g. `/api/leaderboard/Hackerman`)
-- **Headers**:
-  - `x-admin-key: <ADMIN_API_KEY>`
-- **Response `200 OK`**:
-  ```json
-  {
-    "success": true,
-    "message": "Team 'Hackerman' deleted instantly from Supabase backend"
-  }
-  ```
-
----
-
-### 8. Reset Leaderboard (Admin)
-Clears all team entries from the leaderboard.
+### 10. Manual Score Override
+Directly assigns a completed challenge score to a specified team.
 
 - **Method**: `POST`
-- **Path**: `/api/leaderboard/reset`
+- **Path**: `/api/leaderboard/submit`
 - **Headers**:
   - `x-admin-key: <ADMIN_API_KEY>`
+  - `Content-Type: application/json`
+- **Body**:
+  ```json
+  {
+    "team_name": "CyberKnights",
+    "challenges_completed": 5
+  }
+  ```
 - **Response `200 OK`**:
   ```json
   {
     "success": true,
-    "message": "Leaderboard reset successfully across Supabase backend"
+    "message": "Score for team 'CyberKnights' set to 5 instantly",
+    "data": {
+      "rank": 1,
+      "id": "98f7151b-253c-4ee8-9c8a-3755eb41173c",
+      "team_name": "CyberKnights",
+      "challenges_completed": 5
+    }
+  }
+  ```
+
+---
+
+### 11. Score Delta Adjustment
+Adjusts team scores by adding or subtracting points.
+
+- **Method**: `PATCH`
+- **Path**: `/api/leaderboard/:identifier/adjust`
+- **Headers**:
+  - `x-admin-key: <ADMIN_API_KEY>`
+  - `Content-Type: application/json`
+- **Body**:
+  ```json
+  {
+    "delta": 2
+  }
+  ```
+- **Response `200 OK`**:
+  ```json
+  {
+    "success": true,
+    "message": "Score for 'CyberKnights' adjusted by +2",
+    "data": {
+      "rank": 1,
+      "team_name": "CyberKnights",
+      "challenges_completed": 7
+    }
   }
   ```
