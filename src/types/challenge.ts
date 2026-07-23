@@ -22,6 +22,7 @@ export interface Challenge {
   assets: ChallengeAsset[];
   story_fragment?: StoryFragment | null;
   answer_key: string;
+  time_limit?: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -36,6 +37,8 @@ export interface ChallengePublic {
   story_fragment?: StoryFragment | null;
   is_active: boolean;
   is_locked?: boolean;
+  time_limit?: number;
+  challenge_started_at?: string;
   created_at: string;
   updated_at: string;
 }
@@ -47,6 +50,7 @@ export interface TeamProgress {
   completed_challenges: number[];
   attempts_count: number;
   last_attempt_at: string;
+  challenge_started_at: string;
   created_at: string;
   updated_at: string;
 }
@@ -100,6 +104,7 @@ export interface CreateChallengeDto {
   assets?: ChallengeAsset[];
   story_fragment?: StoryFragment;
   answer_key: string;
+  time_limit?: number;
   is_active?: boolean;
 }
 
@@ -110,5 +115,6 @@ export interface UpdateChallengeDto {
   assets?: ChallengeAsset[];
   story_fragment?: StoryFragment;
   answer_key?: string;
+  time_limit?: number;
   is_active?: boolean;
 }

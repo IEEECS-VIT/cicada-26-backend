@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient.js';
+import { supabaseLeaderboardRepository } from './supabaseLeaderboardRepository.js';
 import { IChallengeRepository } from '../interfaces/challengeRepository.js';
 import {
   Challenge,
@@ -48,7 +49,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
   public async getPublicChallenges(): Promise<ChallengePublic[]> {
     const { data, error } = await supabase
       .from('challenges')
-      .select('id, order_number, name, story_context, assets, story_fragment, is_active, created_at, updated_at')
+      .select('id, order_number, name, story_context, assets, story_fragment, time_limit, is_active, created_at, updated_at')
       .eq('is_active', true)
       .order('order_number', { ascending: true });
 
@@ -69,7 +70,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
   public async getPublicChallengeByIdentifier(identifier: string | number): Promise<ChallengePublic | null> {
     let query = supabase
       .from('challenges')
-      .select('id, order_number, name, story_context, assets, story_fragment, is_active, created_at, updated_at')
+      .select('id, order_number, name, story_context, assets, story_fragment, time_limit, is_active, created_at, updated_at')
       .eq('is_active', true);
 
     if (this.isUuid(identifier)) {
@@ -159,6 +160,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
       assets: dto.assets || [],
       story_fragment: dto.story_fragment || {},
       answer_key: dto.answer_key,
+      time_limit: dto.time_limit !== undefined ? dto.time_limit : 1800,
       is_active: dto.is_active !== undefined ? dto.is_active : true,
     };
 
@@ -182,16 +184,23 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
   /**
    * Update challenge (Admin)
    */
-  public async updateChallenge(id: string, dto: UpdateChallengeDto): Promise<Challenge | null> {
-    const { data, error } = await supabase
-      .from('challenges')
-      .update(dto)
-      .eq('id', id)
-      .select()
-      .single();
+  public async updateChallenge(identifier: string, dto: UpdateChallengeDto): Promise<Challenge | null> {
+    let query = supabase.from('challenges').update(dto);
+
+    if (this.isUuid(identifier)) {
+      query = query.eq('id', identifier);
+    } else {
+      const orderNum = parseInt(identifier, 10);
+      if (isNaN(orderNum)) {
+        return null;
+      }
+      query = query.eq('order_number', orderNum);
+    }
+
+    const { data, error } = await query.select().maybeSingle();
 
     if (error) {
-      throw new Error(`Failed to update challenge: ${error.message}`);
+      throw new Error(`Failed to update challenge '${identifier}': ${error.message}`);
     }
 
     if (!data) return null;
@@ -242,6 +251,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
         : data.completed_challenges || [],
       attempts_count: data.attempts_count || 0,
       last_attempt_at: data.last_attempt_at || data.updated_at || data.created_at,
+      challenge_started_at: data.challenge_started_at,
     } as TeamProgress;
   }
 
@@ -262,6 +272,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
       completed_challenges: existing?.completed_challenges || [],
       attempts_count: newCount,
       last_attempt_at: now,
+      challenge_started_at: existing?.challenge_started_at || now,
     };
 
     const { data, error } = await supabase
@@ -303,6 +314,9 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
       completed_challenges,
       attempts_count: attempts_count !== undefined ? attempts_count : (existing?.attempts_count || 0),
       last_attempt_at: now,
+      challenge_started_at: (existing && existing.current_challenge_order === current_challenge_order) 
+        ? existing.challenge_started_at 
+        : now,
     };
 
     const { data, error } = await supabase
@@ -344,6 +358,40 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
       attempts_count: item.attempts_count || 0,
       last_attempt_at: item.last_attempt_at || item.updated_at || item.created_at,
     })) as TeamProgress[];
+  }
+  /**
+   * Admin: Reset a team's progress back to challenge 1
+   */
+  public async resetTeamProgress(team_name: string): Promise<TeamProgress> {
+    await this.ensureTeamInLeaderboard(team_name, 0);
+
+    const now = new Date().toISOString();
+    const payload = {
+      team_name,
+      current_challenge_order: 1,
+      completed_challenges: [],
+      attempts_count: 0,
+      last_attempt_at: now,
+      challenge_started_at: now,
+    };
+
+    const { data, error } = await supabase
+      .from('team_progress')
+      .upsert(payload, { onConflict: 'team_name' })
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to reset team progress for '${team_name}': ${error.message}`);
+    }
+
+    await supabaseLeaderboardRepository.setScoreByName(team_name, 0, now);
+
+    return {
+      ...data,
+      completed_challenges: [],
+      attempts_count: 0,
+    } as TeamProgress;
   }
 }
 

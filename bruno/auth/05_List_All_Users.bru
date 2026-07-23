@@ -1,0 +1,15 @@
+meta {
+  name: 11_List_All_Users
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/admin/users
+  body: none
+  auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
+}

@@ -9,6 +9,8 @@ router.get('/', LeaderboardController.getLeaderboard);
 router.get('/stream', LeaderboardController.streamLeaderboard);
 
 // Admin / System Protected Endpoints
+router.get('/export', requireAdmin, LeaderboardController.exportLeaderboard);
+router.get('/export/csv', requireAdmin, LeaderboardController.exportLeaderboard);
 // Set ANY score to ANY extent by team name (creates or updates directly)
 router.post('/submit', requireAdmin, LeaderboardController.submitScore);
 router.post('/score', requireAdmin, LeaderboardController.submitScore);

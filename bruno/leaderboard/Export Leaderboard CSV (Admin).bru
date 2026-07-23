@@ -1,0 +1,15 @@
+meta {
+  name: Export Leaderboard CSV (Admin)
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/api/leaderboard/export
+  body: none
+  auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
+}

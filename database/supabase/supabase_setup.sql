@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS public.challenges (
     assets JSONB NOT NULL DEFAULT '[]'::jsonb,
     story_fragment JSONB NOT NULL DEFAULT '{}'::jsonb,
     answer_key TEXT NOT NULL,
+    time_limit INTEGER NOT NULL DEFAULT 1800,
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -126,6 +127,7 @@ CREATE TABLE IF NOT EXISTS public.team_progress (
     completed_challenges JSONB NOT NULL DEFAULT '[]'::jsonb,
     attempts_count INTEGER NOT NULL DEFAULT 0 CHECK (attempts_count >= 0),
     last_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    challenge_started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -133,6 +135,7 @@ CREATE TABLE IF NOT EXISTS public.team_progress (
 -- Ensure attempts_count and last_attempt_at columns exist if table was created previously
 ALTER TABLE public.team_progress ADD COLUMN IF NOT EXISTS attempts_count INTEGER NOT NULL DEFAULT 0 CHECK (attempts_count >= 0);
 ALTER TABLE public.team_progress ADD COLUMN IF NOT EXISTS last_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE public.team_progress ADD COLUMN IF NOT EXISTS challenge_started_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
 -- Trigger for team_progress updated_at
 DROP TRIGGER IF EXISTS set_team_progress_updated_at ON public.team_progress;

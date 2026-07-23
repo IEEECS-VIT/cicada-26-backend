@@ -1,0 +1,22 @@
+meta {
+  name: Update Challenge Time Limit (Admin)
+  type: http
+  seq: 11
+}
+
+put {
+  url: {{baseUrl}}/api/challenges/admin/1
+  body: json
+  auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "time_limit": 10
+  }
+}

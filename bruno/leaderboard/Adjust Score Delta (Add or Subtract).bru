@@ -1,0 +1,22 @@
+meta {
+  name: Adjust Score Delta (Add or Subtract)
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/leaderboard/labhesh bhaiya ki jai/adjust
+  body: json
+  auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "delta": -5
+  }
+}

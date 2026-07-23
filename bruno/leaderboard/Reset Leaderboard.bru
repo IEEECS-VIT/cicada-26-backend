@@ -1,0 +1,15 @@
+meta {
+  name: Reset Leaderboard
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/leaderboard/reset
+  body: none
+  auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
+}

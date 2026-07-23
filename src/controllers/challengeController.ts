@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { challengeService } from '../services/challengeService.js';
+import db from '../db.js';
 
 const submitAnswerSchema = z.object({
   team_name: z.string().min(1, 'Team name is required'),
@@ -28,12 +29,13 @@ const storyFragmentSchema = z.object({
 });
 
 const createChallengeSchema = z.object({
-  order_number: z.number().int().min(1, 'Order number must be at least 1'),
-  name: z.string().min(1, 'Challenge name is required'),
+  order_number: z.number().int().min(1),
+  name: z.string().min(1),
   story_context: z.string().optional(),
   assets: z.array(assetSchema).optional(),
   story_fragment: storyFragmentSchema.optional(),
   answer_key: z.string().min(1, 'Answer key is required'),
+  time_limit: z.number().int().min(1).optional(),
   is_active: z.boolean().optional(),
 });
 
@@ -44,6 +46,7 @@ const updateChallengeSchema = z.object({
   assets: z.array(assetSchema).optional(),
   story_fragment: storyFragmentSchema.optional(),
   answer_key: z.string().min(1).optional(),
+  time_limit: z.number().int().min(1).optional(),
   is_active: z.boolean().optional(),
 });
 
@@ -149,7 +152,12 @@ export class ChallengeController {
         res.status(400).json({
           success: false,
           error: `Challenge '${identifier}' is locked for team '${team_name}'. Complete previous challenges first.`,
-          data,
+          data: {
+            id: data.id,
+            order_number: data.order_number,
+            name: data.name,
+            is_locked: true,
+          },
         });
         return;
       }
@@ -368,6 +376,55 @@ export class ChallengeController {
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to delete challenge',
+      });
+    }
+  }
+
+  /**
+   * POST /api/challenges/admin/reset-team
+   * Admin reset team progress
+   */
+  static async resetTeamProgress(req: Request, res: Response): Promise<void> {
+    try {
+      const team_name = String(req.body.team_name || req.query.team_name || '');
+      if (!team_name) {
+        res.status(400).json({ success: false, error: 'team_name is required' });
+        return;
+      }
+      const data = await challengeService.resetTeamProgress(team_name);
+      res.status(200).json({
+        success: true,
+        message: `Team '${team_name}' progress reset successfully`,
+        data,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to reset team progress',
+      });
+    }
+  }
+
+  /**
+   * GET /api/challenges/admin/submission-logs
+   * Admin get/search submission logs
+   */
+  static async getSubmissionLogs(req: Request, res: Response): Promise<void> {
+    try {
+      const team_id = req.query.team_id ? String(req.query.team_id) : undefined;
+      const is_correct = req.query.is_correct !== undefined ? req.query.is_correct === 'true' : undefined;
+      const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 100;
+
+      const logs = await db.submissionLogs.getLogs(team_id, is_correct, limit);
+      res.status(200).json({
+        success: true,
+        message: 'Submission logs fetched successfully',
+        data: logs,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to fetch submission logs',
       });
     }
   }

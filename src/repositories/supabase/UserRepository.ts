@@ -30,10 +30,11 @@ export class SupabaseUserRepository implements IUserRepository {
     return data as User;
   }
 
-  async seedUser(id: string, email: string, display_name: string | null, register_no: string | null, role: 'participant' | 'admin'): Promise<void> {
+  async seedUser(id: string, email: string, display_name: string | null, register_no: string | null, role: 'participant' | 'admin', is_admin_approved: boolean = true): Promise<void> {
+    const payload: any = { id, email, display_name, register_no, role };
     const { error } = await this.supabase
       .from('users')
-      .insert([{ id, email, display_name, register_no, role }]);
+      .insert([payload]);
     if (error) throw new Error(error.message);
   }
 
@@ -52,6 +53,47 @@ export class SupabaseUserRepository implements IUserRepository {
         team_id: teamId, 
         joined_team_at: teamId ? new Date().toISOString() : null 
       })
+      .eq('id', id);
+    if (error) throw new Error(error.message);
+  }
+
+  async updateRole(id: string, role: 'participant' | 'admin'): Promise<void> {
+    const { error } = await this.supabase
+      .from('users')
+      .update({ role })
+      .eq('id', id);
+    if (error) throw new Error(error.message);
+  }
+
+  async approveAdmin(id: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('users')
+      .update({ role: 'admin' })
+      .eq('id', id);
+    if (error) throw new Error(error.message);
+  }
+
+  async countUsers(): Promise<number> {
+    const { count, error } = await this.supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true });
+    if (error) return 0;
+    return count || 0;
+  }
+
+  async listAllUsers(): Promise<User[]> {
+    const { data, error } = await this.supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error || !data) return [];
+    return data as User[];
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('users')
+      .delete()
       .eq('id', id);
     if (error) throw new Error(error.message);
   }

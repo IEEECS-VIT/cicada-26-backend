@@ -1,0 +1,23 @@
+meta {
+  name: Update Team Details (Admin)
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/api/leaderboard/f3b945f5-72d8-4693-a230-83d672134c4e
+  body: json
+  auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "team_name": "AlphaTeam Renamed",
+    "challenges_completed": 5
+  }
+}

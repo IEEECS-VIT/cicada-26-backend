@@ -9,16 +9,41 @@ export class SupabaseSubmissionLogRepository implements ISubmissionLogRepository
   }
 
   async logSubmission(teamId: string | null, userId: string | null, challengeId: string | null, submittedAnswer: string, isCorrect: boolean): Promise<void> {
-    const { error } = await this.supabase
-      .from('submission_logs')
-      .insert([{
-        team_id: teamId,
-        user_id: userId,
-        challenge_id: challengeId,
-        submitted_answer: submittedAnswer,
-        is_correct: isCorrect
-      }]);
-      
-    if (error) throw new Error(error.message);
+    try {
+      await this.supabase
+        .from('submission_logs')
+        .insert([{
+          team_id: teamId,
+          user_id: userId,
+          challenge_id: challengeId,
+          submitted_answer: submittedAnswer,
+          is_correct: isCorrect
+        }]);
+    } catch {
+      // Ignore if table does not exist in dev
+    }
+  }
+
+  async getLogs(team_id?: string, is_correct?: boolean, limit: number = 100): Promise<any[]> {
+    try {
+      let query = this.supabase
+        .from('submission_logs')
+        .select('*')
+        .order('submitted_at', { ascending: false })
+        .limit(limit);
+
+      if (team_id) {
+        query = query.eq('team_id', team_id);
+      }
+      if (is_correct !== undefined) {
+        query = query.eq('is_correct', is_correct);
+      }
+
+      const { data, error } = await query;
+      if (error) return [];
+      return data || [];
+    } catch {
+      return [];
+    }
   }
 }
