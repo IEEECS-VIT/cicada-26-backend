@@ -1,0 +1,23 @@
+meta {
+  name: Submit Out of Order Challenge (Locked)
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/challenges/submit
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "team_name": "NewTeamTestingLocks",
+    "challenge_identifier": 4,
+    "answer": "VAULT_OPEN_2026"
+  }
+}

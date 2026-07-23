@@ -1,0 +1,18 @@
+meta {
+  name: 07_Admin_Delete_Team
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/admin/delete-team
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "admin_user_id": "REPLACE_WITH_ADMIN_USER_ID",
+    "team_id": "REPLACE_WITH_TEAM_ID"
+  }
+}

@@ -1,3 +1,4 @@
+import bcrypt from 'bcrypt';
 import { supabaseChallengeRepository, SupabaseChallengeRepository } from '../database/supabase/supabaseChallengeRepository.js';
 import { supabaseLeaderboardRepository, SupabaseLeaderboardRepository } from '../database/supabase/supabaseLeaderboardRepository.js';
 import {
@@ -13,6 +14,10 @@ import {
   StoryFragment,
 } from '../types/challenge.js';
 
+const isBcryptHash = (str: string): boolean => {
+  return /^\$[2ayb]\$[0-9]{2}\$[./A-Za-z0-9]{53}$/.test(str);
+};
+
 export class ChallengeService {
   constructor(
     private challengeRepo: SupabaseChallengeRepository = supabaseChallengeRepository,
@@ -25,37 +30,75 @@ export class ChallengeService {
    */
   public async getPublicChallenges(team_name?: string): Promise<ChallengePublic[]> {
     const challenges = await this.challengeRepo.getPublicChallenges();
-    if (!team_name || !team_name.trim()) {
-      return challenges;
+    let currentOrder = 1;
+    let progress: any = null;
+    if (team_name && team_name.trim()) {
+      progress = await this.challengeRepo.getTeamProgress(team_name.trim());
+      if (!progress) {
+        progress = await this.challengeRepo.upsertTeamProgress(team_name.trim(), 1, []);
+      }
+      currentOrder = progress?.current_challenge_order || 1;
     }
 
-    const progress = await this.challengeRepo.getTeamProgress(team_name.trim());
-    const currentOrder = progress?.current_challenge_order || 1;
-
-    return challenges.map((item) => ({
-      ...item,
-      is_locked: item.order_number > currentOrder,
-    }));
+    return challenges.map((item) => {
+      const isLocked = item.order_number > currentOrder;
+      if (isLocked) {
+        return {
+          id: item.id,
+          order_number: item.order_number,
+          name: item.name,
+          is_active: item.is_active,
+          is_locked: true,
+          time_limit: item.time_limit || 1800,
+          story_context: undefined,
+          assets: undefined,
+          story_fragment: undefined,
+        } as unknown as ChallengePublic;
+      }
+      return {
+        ...item,
+        is_locked: false,
+        time_limit: item.time_limit || 1800,
+        challenge_started_at: item.order_number === currentOrder && progress ? progress.challenge_started_at : undefined
+      };
+    });
   }
 
-  /**
-   * Get single public challenge details (without answer key)
-   * Optionally annotates is_locked status if team_name is provided
-   */
   public async getPublicChallenge(identifier: string | number, team_name?: string): Promise<ChallengePublic | null> {
     const challenge = await this.challengeRepo.getPublicChallengeByIdentifier(identifier);
     if (!challenge) return null;
 
+    let currentOrder = 1;
+    let progress: any = null;
     if (team_name && team_name.trim()) {
-      const progress = await this.challengeRepo.getTeamProgress(team_name.trim());
-      const currentOrder = progress?.current_challenge_order || 1;
-      return {
-        ...challenge,
-        is_locked: challenge.order_number > currentOrder,
-      };
+      progress = await this.challengeRepo.getTeamProgress(team_name.trim());
+      if (!progress) {
+        progress = await this.challengeRepo.upsertTeamProgress(team_name.trim(), 1, []);
+      }
+      currentOrder = progress?.current_challenge_order || 1;
     }
 
-    return challenge;
+    const isLocked = challenge.order_number > currentOrder;
+    if (isLocked) {
+      return {
+        id: challenge.id,
+        order_number: challenge.order_number,
+        name: challenge.name,
+        is_active: challenge.is_active,
+        is_locked: true,
+        time_limit: challenge.time_limit || 1800,
+        story_context: undefined,
+        assets: undefined,
+        story_fragment: undefined,
+      } as unknown as ChallengePublic;
+    }
+
+    return {
+      ...challenge,
+      is_locked: false,
+      time_limit: challenge.time_limit || 1800,
+      challenge_started_at: challenge.order_number === currentOrder && progress ? progress.challenge_started_at : undefined
+    };
   }
 
   /**
@@ -90,6 +133,20 @@ export class ChallengeService {
       throw new Error(`Challenge '${challenge_identifier}' not found`);
     }
 
+    // Verify time limit/timeout
+    if (existingProgress && existingProgress.challenge_started_at) {
+      const startedAt = new Date(existingProgress.challenge_started_at).getTime();
+      const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
+      const limit = challenge.time_limit !== undefined ? challenge.time_limit : 1800;
+      if (elapsedSeconds > limit) {
+        return {
+          success: false,
+          message: 'Time Limit Exceeded for this challenge.',
+          tryAgain: false,
+        };
+      }
+    }
+
     // Strict Sequential Lock Rule: Team cannot attempt challenge N if N > currentUnlockedOrder
     if (challenge.order_number > currentUnlockedOrder) {
       return {
@@ -101,9 +158,15 @@ export class ChallengeService {
 
     // Normalize comparison: trim leading/trailing spaces, case insensitive
     const normalizedSubmitted = answer.trim().toLowerCase();
-    const normalizedCorrect = challenge.answer_key.trim().toLowerCase();
+    let isCorrect = false;
 
-    if (normalizedSubmitted !== normalizedCorrect) {
+    if (isBcryptHash(challenge.answer_key)) {
+      isCorrect = await bcrypt.compare(normalizedSubmitted, challenge.answer_key);
+    } else {
+      isCorrect = normalizedSubmitted === challenge.answer_key.trim().toLowerCase();
+    }
+
+    if (!isCorrect) {
       return {
         success: false,
         message: 'Incorrect Authentication Key',
@@ -154,7 +217,7 @@ export class ChallengeService {
     const allChallenges = await this.challengeRepo.getPublicChallenges();
 
     const unlockedFragments = allChallenges
-      .filter((c) => completedOrders.includes(c.order_number) && c.story_fragment && Object.keys(c.story_fragment).length > 0)
+      .filter((c) => completedOrders.includes(c.order_number) && c.story_fragment !== undefined && c.story_fragment !== null)
       .map((c) => ({
         challenge_order: c.order_number,
         challenge_name: c.name,
@@ -283,14 +346,22 @@ export class ChallengeService {
    * Admin: Create new challenge
    */
   public async createChallenge(dto: CreateChallengeDto): Promise<Challenge> {
-    return this.challengeRepo.createChallenge(dto);
+    const hashedDto = { ...dto };
+    if (dto.answer_key) {
+      hashedDto.answer_key = await bcrypt.hash(dto.answer_key.trim().toLowerCase(), 10);
+    }
+    return this.challengeRepo.createChallenge(hashedDto);
   }
 
   /**
    * Admin: Update challenge
    */
   public async updateChallenge(id: string, dto: UpdateChallengeDto): Promise<Challenge | null> {
-    return this.challengeRepo.updateChallenge(id, dto);
+    const hashedDto = { ...dto };
+    if (dto.answer_key) {
+      hashedDto.answer_key = await bcrypt.hash(dto.answer_key.trim().toLowerCase(), 10);
+    }
+    return this.challengeRepo.updateChallenge(id, hashedDto);
   }
 
   /**
@@ -298,6 +369,16 @@ export class ChallengeService {
    */
   public async deleteChallenge(id: string): Promise<boolean> {
     return this.challengeRepo.deleteChallenge(id);
+  }
+
+  /**
+   * Admin: Reset a team's progress back to challenge 1
+   */
+  public async resetTeamProgress(team_name: string): Promise<TeamProgress> {
+    if (!team_name || !team_name.trim()) {
+      throw new Error('Team name is required');
+    }
+    return this.challengeRepo.resetTeamProgress(team_name.trim());
   }
 }
 

@@ -1,0 +1,23 @@
+meta {
+  name: Admin Override Unlock
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/api/challenges/admin/override
+  body: json
+  auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "team_name": "CyberKnights",
+    "target_challenge_order": 3
+  }
+}

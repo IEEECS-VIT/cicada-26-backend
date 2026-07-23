@@ -200,4 +200,29 @@ export class LeaderboardController {
       });
     }
   }
+
+  /**
+   * GET /api/leaderboard/export
+   * Export live leaderboard snapshot to CSV format.
+   */
+  static async exportLeaderboard(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await LeaderboardService.getLiveLeaderboard();
+      let csv = 'Rank,Team Name,Challenges Completed,Completion Time\n';
+      data.forEach((row: any) => {
+        const teamName = `"${(row.team_name || '').replace(/"/g, '""')}"`;
+        const time = row.completion_time || row.updated_at || '';
+        csv += `${row.rank},${teamName},${row.challenges_completed},"${time}"\n`;
+      });
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename="cicada_leaderboard.csv"');
+      res.status(200).send(csv);
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to export leaderboard to CSV',
+      });
+    }
+  }
 }

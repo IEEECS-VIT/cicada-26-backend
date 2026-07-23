@@ -1,0 +1,15 @@
+meta {
+  name: Get Submission Logs (Admin)
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/api/challenges/admin/submission-logs
+  body: none
+  auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
+}

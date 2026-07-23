@@ -1,0 +1,26 @@
+meta {
+  name: Get Admin Progress Tracking
+  type: http
+  seq: 8
+}
+
+put {
+  url: {{baseUrl}}/api/challenges/admin/fb9f18a9-82bf-44f2-b609-9420d2bc554a
+  body: json
+  auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "time_limit": 10
+  }
+}
+
+vars:pre-request {
+  adminKey: sb_secret_PDPDEMJYJko0s5Bg7fP_GQ_hO5TgW09
+}

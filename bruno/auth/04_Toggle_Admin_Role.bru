@@ -1,0 +1,23 @@
+meta {
+  name: 10_Toggle_Admin_Role
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/admin/toggle-role
+  body: json
+  auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "target_email": "user_to_toggle@gmail.com",
+    "role": "admin"
+  }
+}

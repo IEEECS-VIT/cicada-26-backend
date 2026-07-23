@@ -34,3 +34,7 @@ CREATE TABLE IF NOT EXISTS submission_logs (
   is_correct BOOLEAN DEFAULT FALSE NOT NULL,
   submitted_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- 5. Alter tables to support Round Timer (Section 12)
+ALTER TABLE public.challenges ADD COLUMN IF NOT EXISTS time_limit INTEGER NOT NULL DEFAULT 1800;
+ALTER TABLE public.team_progress ADD COLUMN IF NOT EXISTS challenge_started_at TIMESTAMPTZ NOT NULL DEFAULT NOW();

@@ -1,0 +1,22 @@
+meta {
+  name: Reset Team Progress (Admin)
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/api/challenges/admin/reset-team
+  body: json
+  auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "team_name": "CyberKnights"
+  }
+}
