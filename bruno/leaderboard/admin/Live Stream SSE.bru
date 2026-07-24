@@ -5,7 +5,11 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/api/leaderboard/stream
+  url: {{baseUrl}}/api/admin/leaderboard/stream
   body: none
   auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
 }

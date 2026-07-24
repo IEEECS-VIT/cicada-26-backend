@@ -77,7 +77,7 @@ Returned when an unhandled server error or database query failure occurs.
 | :--- | :--- | :--- | :--- |
 | `GET` | `/health` | Public | System health check and service status |
 | `GET` | `/api/leaderboard` | Public | Ordered live leaderboard snapshot |
-| `GET` | `/api/leaderboard/stream` | Public | Server-Sent Events (SSE) real-time streaming endpoint |
+| `GET` | `/api/admin/leaderboard/stream` | Admin | Server-Sent Events (SSE) real-time streaming endpoint |
 | `POST` | `/api/leaderboard/submit` | Admin | Directly set score for any team by `team_name` |
 | `POST` | `/api/leaderboard/score` | Admin | Alias endpoint for setting team scores |
 | `PATCH` | `/api/leaderboard/:identifier/adjust` | Admin | Adjust team score using positive or negative point delta |
@@ -595,6 +595,7 @@ Creates a new challenge record with associated assets and story fragments.
       "content": "All vaults unsealed."
     },
     "answer_key": "VAULT_OPEN_2026",
+    "time_limit": 1800,
     "is_active": true
   }
   ```

@@ -1,0 +1,22 @@
+meta {
+  name: Bulk Import Admins from CSV
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/admin/auth/bulk-import-admins
+  body: json
+  auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "csv_data": "email,display_name,register_no\nadmin1@cicada2067.org,Head Admin Alpha,ADM-001\nadmin2@cicada2067.org,System Admin Beta,ADM-002\nreviewer@cicada2067.org,Reviewer Admin Gamma,ADM-003"
+  }
+}

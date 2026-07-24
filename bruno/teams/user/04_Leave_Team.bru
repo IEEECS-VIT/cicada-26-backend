@@ -1,0 +1,21 @@
+meta {
+  name: Leave Team
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/teams/leave
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "user_id": "YOUR_USER_UUID"
+  }
+}

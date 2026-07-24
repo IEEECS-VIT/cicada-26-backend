@@ -87,4 +87,5 @@ export interface ITeamProgressRepository {
 
 export interface ISubmissionLogRepository {
   logSubmission(teamId: string | null, userId: string | null, challengeId: string | null, submittedAnswer: string, isCorrect: boolean): Promise<void>;
+  getLogs(team_id?: string, is_correct?: boolean, limit?: number): Promise<any[]>;
 }
