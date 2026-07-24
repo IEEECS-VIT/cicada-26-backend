@@ -1,19 +1,33 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import leaderboardRoutes from './routes/leaderboardRoutes.js';
-import challengeRoutes from './routes/challengeRoutes.js';
+
+// User Routes
+import userAuthRoutes from './routes/user/authRoutes.js';
+import userTeamRoutes from './routes/user/teamRoutes.js';
+import userChallengeRoutes from './routes/user/challengeRoutes.js';
+import userLeaderboardRoutes from './routes/user/leaderboardRoutes.js';
+
+// Admin Routes
+import adminAuthRoutes from './routes/admin/authRoutes.js';
+import adminTeamRoutes from './routes/admin/teamRoutes.js';
+import adminChallengeRoutes from './routes/admin/challengeRoutes.js';
+import adminLeaderboardRoutes from './routes/admin/leaderboardRoutes.js';
 
 const app: Express = express();
 
 // Middlewares
-app.use(helmet());
 app.use(cors());
 app.use(express.json());
-app.use(morgan('dev'));
 
-// Health Check
+// Cache Disabling Middleware for Security
+app.use((req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
+// Health Checks
 app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({
     status: 'UP',
@@ -22,9 +36,27 @@ app.get('/health', (req: Request, res: Response) => {
   });
 });
 
-// API Routes
-app.use('/api/leaderboard', leaderboardRoutes);
-app.use('/api/challenges', challengeRoutes);
+app.get('/api/health', (req: Request, res: Response) => {
+  res.json({ status: 'ok', message: 'Cicada 2067 Backend is live and Database Agnostic!' });
+});
+
+// User API Routes
+app.use('/api/auth', userAuthRoutes);
+app.use('/api/dev', userAuthRoutes);
+app.use('/api/teams', userTeamRoutes);
+app.use('/api/challenges', userChallengeRoutes);
+app.use('/api/leaderboard', userLeaderboardRoutes);
+
+// Admin API Routes (Modular directory tree)
+app.use('/api/admin/auth', adminAuthRoutes);
+app.use('/api/admin/teams', adminTeamRoutes);
+app.use('/api/admin/challenges', adminChallengeRoutes);
+app.use('/api/admin/leaderboard', adminLeaderboardRoutes);
+
+// Legacy/Compatibility Aliases for Root Admin Paths
+app.use('/api/admin', adminAuthRoutes);
+app.use('/api/admin', adminTeamRoutes);
+app.use('/api/challenges/admin', adminChallengeRoutes);
 
 // 404 Handler
 app.use((req: Request, res: Response) => {

@@ -393,6 +393,26 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
       attempts_count: 0,
     } as TeamProgress;
   }
+
+  public async getSubmissionLogs(limit: number = 100, team_name?: string): Promise<any[]> {
+    try {
+      let query = supabase
+        .from('submission_logs')
+        .select('*')
+        .order('submitted_at', { ascending: false })
+        .limit(limit);
+
+      if (team_name) {
+        query = query.eq('team_id', team_name);
+      }
+
+      const { data, error } = await query;
+      if (error) return [];
+      return data || [];
+    } catch {
+      return [];
+    }
+  }
 }
 
 export const supabaseChallengeRepository = new SupabaseChallengeRepository();

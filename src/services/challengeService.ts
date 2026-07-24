@@ -12,6 +12,7 @@ import {
   ParticipantProgress,
   AdminTeamProgressSummary,
   StoryFragment,
+  TeamProgress,
 } from '../types/challenge.js';
 
 const isBcryptHash = (str: string): boolean => {
@@ -379,6 +380,10 @@ export class ChallengeService {
       throw new Error('Team name is required');
     }
     return this.challengeRepo.resetTeamProgress(team_name.trim());
+  }
+
+  public async getSubmissionLogs(limit?: number, team_name?: string): Promise<any[]> {
+    return this.challengeRepo.getSubmissionLogs(limit, team_name);
   }
 }
 
