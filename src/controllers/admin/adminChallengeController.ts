@@ -45,6 +45,56 @@ const adminOverrideSchema = z.object({
 
 export class AdminChallengeController {
   /**
+   * GET /api/admin/challenges
+   * List active challenges (Admin-only access)
+   */
+  static async getPublicChallenges(req: Request, res: Response): Promise<void> {
+    try {
+      const team_name = req.query.team_name ? String(req.query.team_name) : undefined;
+      const data = await challengeService.getPublicChallenges(team_name);
+      res.status(200).json({
+        success: true,
+        message: 'Active challenges fetched successfully',
+        data,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to fetch challenges',
+      });
+    }
+  }
+
+  /**
+   * GET /api/admin/challenges/participant-progress
+   * Get participant progress tracking (Admin-only access)
+   */
+  static async getParticipantProgress(req: Request, res: Response): Promise<void> {
+    try {
+      const team_name = String(req.query.team_name || req.params.team_name || '');
+      if (!team_name.trim()) {
+        res.status(400).json({
+          success: false,
+          error: 'Query parameter team_name is required',
+        });
+        return;
+      }
+
+      const data = await challengeService.getParticipantProgress(team_name);
+      res.status(200).json({
+        success: true,
+        message: `Progress state for team '${team_name}' fetched successfully`,
+        data,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to fetch participant progress',
+      });
+    }
+  }
+
+  /**
    * GET /api/admin/challenges/all
    */
   static async getAllChallengesAdmin(req: Request, res: Response): Promise<void> {
