@@ -1,0 +1,15 @@
+meta {
+  name: Delete Asset
+  type: http
+  seq: 16
+}
+
+delete {
+  url: {{baseUrl}}/api/admin/challenges/1/assets/Beacon Spectrum Analysis
+  body: none
+  auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
+}

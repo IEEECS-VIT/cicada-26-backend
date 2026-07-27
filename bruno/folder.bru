@@ -1,0 +1,10 @@
+script:pre-request {
+  const userEmail = bru.getEnvVar("userEmail");
+  if (userEmail) {
+    req.setHeader("x-user-email", userEmail);
+  }
+  const adminKey = bru.getEnvVar("adminKey");
+  if (adminKey) {
+    req.setHeader("x-admin-key", adminKey);
+  }
+}

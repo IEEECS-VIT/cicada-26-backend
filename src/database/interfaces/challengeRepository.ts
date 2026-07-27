@@ -4,6 +4,7 @@ import {
   TeamProgress,
   CreateChallengeDto,
   UpdateChallengeDto,
+  ChallengeAsset,
 } from '../../types/challenge.js';
 
 export interface IChallengeRepository {
@@ -22,5 +23,9 @@ export interface IChallengeRepository {
     attempts_count?: number
   ): Promise<TeamProgress>;
   recordAttempt(team_name: string): Promise<TeamProgress>;
+  updateChallengeStartedAt(team_name: string, started_at: string | null, clientIp?: string | null): Promise<TeamProgress>;
   getAllTeamsProgressAdmin(): Promise<TeamProgress[]>;
+  addAssetToChallenge(challengeId: string, asset: Omit<ChallengeAsset, 'id'> & { id?: string }): Promise<ChallengeAsset[]>;
+  editAssetInChallenge(challengeId: string, assetId: string, updatedAsset: Partial<ChallengeAsset>): Promise<ChallengeAsset[]>;
+  deleteAssetFromChallenge(challengeId: string, assetId: string): Promise<ChallengeAsset[]>;
 }

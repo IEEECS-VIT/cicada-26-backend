@@ -36,7 +36,9 @@ EXECUTE FUNCTION update_modified_column();
 
 -- 4. Create Dynamic Live Leaderboard View with Calculated Ranks
 -- Solves requirement: Sorted by 1. Challenges Solved (DESC), 2. Time Taken / Completion Time (ASC)
-CREATE OR REPLACE VIEW public.live_leaderboard AS
+CREATE OR REPLACE VIEW public.live_leaderboard 
+WITH (security_invoker = true) 
+AS
 SELECT 
     ROW_NUMBER() OVER (
         ORDER BY challenges_completed DESC, completion_time ASC
@@ -96,6 +98,7 @@ CREATE TABLE IF NOT EXISTS public.challenges (
     story_context TEXT,
     assets JSONB NOT NULL DEFAULT '[]'::jsonb,
     story_fragment JSONB NOT NULL DEFAULT '{}'::jsonb,
+    hints JSONB NOT NULL DEFAULT '[]'::jsonb,
     answer_key TEXT NOT NULL,
     time_limit INTEGER NOT NULL DEFAULT 1800,
     is_active BOOLEAN NOT NULL DEFAULT true,
@@ -103,8 +106,9 @@ CREATE TABLE IF NOT EXISTS public.challenges (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Ensure story_fragment column exists if table was created previously
+-- Ensure story_fragment and hints columns exist if table was created previously
 ALTER TABLE public.challenges ADD COLUMN IF NOT EXISTS story_fragment JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE public.challenges ADD COLUMN IF NOT EXISTS hints JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 -- Index for ordering challenges
 CREATE INDEX IF NOT EXISTS idx_challenges_order ON public.challenges (order_number ASC);
@@ -127,7 +131,8 @@ CREATE TABLE IF NOT EXISTS public.team_progress (
     completed_challenges JSONB NOT NULL DEFAULT '[]'::jsonb,
     attempts_count INTEGER NOT NULL DEFAULT 0 CHECK (attempts_count >= 0),
     last_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    challenge_started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    challenge_started_at TIMESTAMPTZ,
+    started_ip VARCHAR(45),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -135,7 +140,9 @@ CREATE TABLE IF NOT EXISTS public.team_progress (
 -- Ensure attempts_count and last_attempt_at columns exist if table was created previously
 ALTER TABLE public.team_progress ADD COLUMN IF NOT EXISTS attempts_count INTEGER NOT NULL DEFAULT 0 CHECK (attempts_count >= 0);
 ALTER TABLE public.team_progress ADD COLUMN IF NOT EXISTS last_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
-ALTER TABLE public.team_progress ADD COLUMN IF NOT EXISTS challenge_started_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE public.team_progress ADD COLUMN IF NOT EXISTS challenge_started_at TIMESTAMPTZ;
+ALTER TABLE public.team_progress ALTER COLUMN challenge_started_at DROP NOT NULL;
+ALTER TABLE public.team_progress ALTER COLUMN challenge_started_at DROP DEFAULT;
 
 -- Trigger for team_progress updated_at
 DROP TRIGGER IF EXISTS set_team_progress_updated_at ON public.team_progress;

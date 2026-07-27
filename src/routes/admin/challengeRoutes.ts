@@ -17,4 +17,15 @@ router.post('/override', AdminChallengeController.adminOverride);
 router.post('/reset-team', AdminChallengeController.resetTeamProgress);
 router.get('/submission-logs', AdminChallengeController.getSubmissionLogs);
 
+// Hint Management routes pointing to the challenge
+router.post('/:id/hints', AdminChallengeController.addHint);
+router.put('/:id/hints/:hintId', AdminChallengeController.editHint);
+router.delete('/:id/hints/:hintId', AdminChallengeController.deleteHint);
+router.patch('/:id/hints/:hintId/toggle', AdminChallengeController.toggleHint);
+
+// Asset Management routes pointing to the challenge
+router.post('/:id/assets', AdminChallengeController.addAsset);
+router.put('/:id/assets/:assetId', AdminChallengeController.editAsset);
+router.delete('/:id/assets/:assetId', AdminChallengeController.deleteAsset);
+
 export default router;

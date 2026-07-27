@@ -1,0 +1,22 @@
+meta {
+  name: Verify GOD Super Admin Login
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/god/auth/verify-login
+  body: json
+  auth: none
+}
+
+headers {
+  x-god-key: god_secret_CICADA_SUPER_ADMIN_2067
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "god@cicada2067.org"
+  }
+}

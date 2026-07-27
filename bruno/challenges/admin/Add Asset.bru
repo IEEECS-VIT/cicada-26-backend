@@ -1,0 +1,25 @@
+meta {
+  name: Add Asset
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/api/admin/challenges/1/assets
+  body: json
+  auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "type": "image",
+    "url": "https://images.unsplash.com/photo-1518770660439-4636190af475",
+    "name": "Beacon Spectrum Analysis",
+    "caption": "A spectrum analysis of the broadcast signal."
+  }
+}

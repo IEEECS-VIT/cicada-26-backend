@@ -1,0 +1,15 @@
+meta {
+  name: Toggle Hint
+  type: http
+  seq: 13
+}
+
+patch {
+  url: {{baseUrl}}/api/admin/challenges/:id/hints/:hintId/toggle
+  body: none
+  auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
+}

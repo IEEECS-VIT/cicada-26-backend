@@ -1,0 +1,18 @@
+meta {
+  name: 02_User_Login
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/auth/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "test@admin.com",
+    "google_display_name": "Admin tester"
+  }
+}

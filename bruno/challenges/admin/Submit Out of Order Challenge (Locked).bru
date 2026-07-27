@@ -1,7 +1,7 @@
 meta {
   name: Submit Out of Order Challenge (Locked)
   type: http
-  seq: 5
+  seq: 2
 }
 
 post {
@@ -12,6 +12,7 @@ post {
 
 headers {
   Content-Type: application/json
+  x-admin-key: {{adminKey}}
 }
 
 body:json {
@@ -20,8 +21,4 @@ body:json {
     "challenge_identifier": 4,
     "answer": "VAULT_OPEN_2026"
   }
-}
-
-headers {
-  x-admin-key: {{adminKey}}
 }

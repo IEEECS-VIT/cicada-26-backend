@@ -1,0 +1,22 @@
+meta {
+  name: Grant GOD Role to Admin
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/god/auth/grant-god-role
+  body: json
+  auth: none
+}
+
+headers {
+  x-god-key: god_secret_CICADA_SUPER_ADMIN_2067
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "target_email": "admin1@cicada2067.org"
+  }
+}

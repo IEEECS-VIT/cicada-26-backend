@@ -290,6 +290,7 @@ Retrieves detailed information for a single challenge by order number or UUID.
 Validates participant input against challenge solution requirements.
 - Performs case-insensitive matching with leading and trailing whitespace trimming.
 - Enforces strict sequential challenge progression (blocks out-of-order attempts).
+- Enforces a sliding window rate limit of **5 attempts per minute per IP and Team Name** to mitigate key brute-forcing.
 - Automatically increments attempt telemetry, updates team progress, unlocks the next challenge, and updates live leaderboard metrics upon success.
 
 - **Method**: `POST`

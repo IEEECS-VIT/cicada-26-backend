@@ -4,6 +4,10 @@ const PORT = 5000;
 
 // Helper to make requests
 function makeRequest(options, postData = null) {
+  if (!options.headers) {
+    options.headers = {};
+  }
+  options.headers['x-admin-key'] = 'sb_secret_PDPDEMJYJko0s5Bg7fP_GQ_hO5TgW09';
   return new Promise((resolve, reject) => {
     const req = http.request(options, (res) => {
       let data = '';

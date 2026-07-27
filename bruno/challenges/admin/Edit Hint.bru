@@ -1,0 +1,22 @@
+meta {
+  name: Edit Hint
+  type: http
+  seq: 10
+}
+
+put {
+  url: {{baseUrl}}/api/admin/challenges/:id/hints/:hintId
+  body: json
+  auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "text": "This is the updated hint text."
+  }
+}

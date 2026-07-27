@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import db from '../../db.js';
+import { logAdminActivity } from '../../services/auditLogger.js';
 
 export class AdminTeamController {
   /**
@@ -21,6 +22,8 @@ export class AdminTeamController {
       }
 
       await db.teams.removeMember(target_user_id, team_id);
+      await logAdminActivity(req, 'REMOVE_TEAM_MEMBER', { target_user_id, team_id });
+
       res.json({ success: true, message: `Member '${target_user_id}' removed from team '${team_id}' by admin.` });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -40,6 +43,8 @@ export class AdminTeamController {
       }
 
       await db.teams.deleteTeam(team_id);
+      await logAdminActivity(req, 'DELETE_TEAM', { team_id });
+
       res.json({ success: true, message: 'Team forcefully deleted by admin.' });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });

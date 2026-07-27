@@ -18,6 +18,15 @@ function logFail(msg) {
 }
 
 function makeRequest(options, postData = null) {
+  if (!options.headers) {
+    options.headers = {};
+  }
+  if (options.path !== '/api/challenges/admin/all' && options.path !== '/api/admin/challenges/progress' && options.path !== '/api/admin/challenges/all' && !options.path.startsWith('/api/admin/challenges/progress') && !options.path.endsWith('/progress')) {
+    options.headers['x-admin-key'] = ADMIN_KEY;
+  }
+  if (postData && !options.headers['Content-Type']) {
+    options.headers['Content-Type'] = 'application/json';
+  }
   return new Promise((resolve, reject) => {
     const req = http.request(options, (res) => {
       let data = '';
