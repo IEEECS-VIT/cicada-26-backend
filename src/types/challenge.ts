@@ -1,17 +1,24 @@
 export type AssetType = 'image' | 'pdf' | 'audio' | 'video' | 'file' | 'text';
 
 export interface ChallengeAsset {
+  id?: string | undefined;
   type: AssetType;
-  url?: string;
-  name?: string;
-  caption?: string;
-  content?: string;
+  url?: string | undefined;
+  name?: string | undefined;
+  caption?: string | undefined;
+  content?: string | undefined;
 }
 
 export interface StoryFragment {
   title: string;
   header?: string;
   content: string;
+}
+
+export interface ChallengeHint {
+  id: string;
+  text: string;
+  is_visible: boolean;
 }
 
 export interface Challenge {
@@ -21,6 +28,7 @@ export interface Challenge {
   story_context?: string | null;
   assets: ChallengeAsset[];
   story_fragment?: StoryFragment | null;
+  hints?: ChallengeHint[] | null;
   answer_key: string;
   time_limit?: number;
   is_active: boolean;
@@ -35,10 +43,11 @@ export interface ChallengePublic {
   story_context?: string | null;
   assets: ChallengeAsset[];
   story_fragment?: StoryFragment | null;
+  hints?: ChallengeHint[] | null;
   is_active: boolean;
   is_locked?: boolean;
   time_limit?: number;
-  challenge_started_at?: string;
+  challenge_started_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -50,7 +59,8 @@ export interface TeamProgress {
   completed_challenges: number[];
   attempts_count: number;
   last_attempt_at: string;
-  challenge_started_at: string;
+  challenge_started_at: string | null;
+  started_ip?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -103,6 +113,7 @@ export interface CreateChallengeDto {
   story_context?: string;
   assets?: ChallengeAsset[];
   story_fragment?: StoryFragment;
+  hints?: ChallengeHint[];
   answer_key: string;
   time_limit?: number;
   is_active?: boolean;
@@ -114,6 +125,7 @@ export interface UpdateChallengeDto {
   story_context?: string;
   assets?: ChallengeAsset[];
   story_fragment?: StoryFragment;
+  hints?: ChallengeHint[];
   answer_key?: string;
   time_limit?: number;
   is_active?: boolean;

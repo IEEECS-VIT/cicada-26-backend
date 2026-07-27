@@ -1,0 +1,19 @@
+meta {
+  name: Get Masked Asset
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/challenges/assets/masked?c=1&i=0
+  body: none
+  auth: none
+}
+
+headers {
+  x-user-email: test@admin.com
+}
+
+vars:pre-request {
+  baseUrl: http://localhost:5000
+}

@@ -3,7 +3,7 @@ export interface User {
   email: string;
   display_name: string | null;
   register_no: string | null;
-  role: 'participant' | 'admin';
+  role: 'participant' | 'admin' | 'GOD';
   is_admin_approved?: boolean;
   team_id: string | null;
   joined_team_at: Date | null;
@@ -51,13 +51,23 @@ export interface SubmissionLog {
   submitted_at: Date;
 }
 
+export interface AdminLog {
+  id: string;
+  admin_email: string;
+  admin_username?: string;
+  action: string;
+  details: any;
+  ip_address?: string;
+  created_at: Date | string;
+}
+
 export interface IUserRepository {
   findById(id: string): Promise<User | null>;
   findByEmail(email: string): Promise<User | null>;
-  seedUser(id: string, email: string, display_name: string | null, register_no: string | null, role: 'participant' | 'admin', is_admin_approved?: boolean): Promise<void>;
+  seedUser(id: string, email: string, display_name: string | null, register_no: string | null, role: 'participant' | 'admin' | 'GOD', is_admin_approved?: boolean): Promise<void>;
   updateDisplayName(id: string, displayName: string): Promise<void>;
   updateTeam(id: string, teamId: string | null): Promise<void>;
-  updateRole(id: string, role: 'participant' | 'admin'): Promise<void>;
+  updateRole(id: string, role: 'participant' | 'admin' | 'GOD'): Promise<void>;
   approveAdmin(id: string): Promise<void>;
   countUsers(): Promise<number>;
   listAllUsers(): Promise<User[]>;
@@ -88,4 +98,11 @@ export interface ITeamProgressRepository {
 export interface ISubmissionLogRepository {
   logSubmission(teamId: string | null, userId: string | null, challengeId: string | null, submittedAnswer: string, isCorrect: boolean): Promise<void>;
   getLogs(team_id?: string, is_correct?: boolean, limit?: number): Promise<any[]>;
+}
+
+export interface IAdminLogRepository {
+  logAction(adminEmail: string, action: string, details?: any, ipAddress?: string): Promise<void>;
+  getLogs(limit?: number): Promise<AdminLog[]>;
+  deleteLog(id: string): Promise<void>;
+  clearLogs(): Promise<void>;
 }

@@ -1,0 +1,23 @@
+meta {
+  name: Add Hint
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/admin/challenges/1/hints
+  body: json
+  auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "text": "This is a useful hint for solving the challenge.",
+    "is_visible": true
+  }
+}

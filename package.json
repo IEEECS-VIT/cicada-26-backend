@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "npx tsx src/index.ts",
+    "dev": "npx tsx watch src/index.ts",
     "seed:admins": "npx tsx src/scripts/seed_admins_csv.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

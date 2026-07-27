@@ -1,0 +1,22 @@
+meta {
+  name: Edit Asset
+  type: http
+  seq: 15
+}
+
+put {
+  url: {{baseUrl}}/api/admin/challenges/1/assets/Beacon Spectrum Analysis
+  body: json
+  auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "caption": "An updated spectrum analysis showing dynamic changes in signal frequency."
+  }
+}

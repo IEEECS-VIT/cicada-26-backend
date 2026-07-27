@@ -16,3 +16,16 @@ body:json {
     "google_display_name": "Shikhar"
   }
 }
+
+script:post-response {
+  if (res.status === 200 && res.body.success) {
+    if (res.body.admin_secret_key) {
+      bru.setEnvVar("adminKey", res.body.admin_secret_key);
+    } else {
+      bru.setEnvVar("adminKey", "");
+    }
+    if (res.body.user && res.body.user.email) {
+      bru.setEnvVar("userEmail", res.body.user.email);
+    }
+  }
+}

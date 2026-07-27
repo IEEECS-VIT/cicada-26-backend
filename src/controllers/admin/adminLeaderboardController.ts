@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { LeaderboardService } from '../../services/leaderboardService.js';
+import { logAdminActivity } from '../../services/auditLogger.js';
 
 const submitScoreSchema = z.object({
   team_name: z.string().min(1, 'Team name is required'),
@@ -31,6 +32,9 @@ export class AdminLeaderboardController {
         validatedData.challenges_completed,
         validatedData.completion_time
       );
+
+      await logAdminActivity(req, 'SET_TEAM_SCORE', validatedData);
+
       res.status(200).json({
         success: true,
         message: `Score for team '${validatedData.team_name}' set to ${validatedData.challenges_completed} instantly`,
@@ -60,6 +64,8 @@ export class AdminLeaderboardController {
       const identifier = String(req.params.identifier || req.body.identifier || req.params.id);
       const { delta } = adjustScoreSchema.parse(req.body);
       const result = await LeaderboardService.adjustScore(identifier, delta);
+
+      await logAdminActivity(req, 'ADJUST_TEAM_SCORE', { identifier, delta });
 
       res.status(200).json({
         success: true,
@@ -99,6 +105,8 @@ export class AdminLeaderboardController {
         return;
       }
 
+      await logAdminActivity(req, 'UPDATE_LEADERBOARD_ENTRY', { id, updates: validatedData });
+
       res.status(200).json({
         success: true,
         message: 'Team entry modified successfully in Supabase backend',
@@ -127,6 +135,9 @@ export class AdminLeaderboardController {
     try {
       const identifier = String(req.params.identifier || req.params.id);
       await LeaderboardService.deleteTeam(identifier);
+
+      await logAdminActivity(req, 'DELETE_LEADERBOARD_TEAM', { identifier });
+
       res.status(200).json({
         success: true,
         message: `Team '${identifier}' deleted instantly from Supabase backend`,
@@ -145,6 +156,9 @@ export class AdminLeaderboardController {
   static async resetLeaderboard(req: Request, res: Response): Promise<void> {
     try {
       await LeaderboardService.resetLeaderboard();
+
+      await logAdminActivity(req, 'RESET_LEADERBOARD', {});
+
       res.status(200).json({
         success: true,
         message: 'Leaderboard reset successfully across Supabase backend',

@@ -1,0 +1,15 @@
+meta {
+  name: Clear Admin Audit Logs (GOD Only)
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/api/god/logs
+  body: none
+  auth: none
+}
+
+headers {
+  x-god-key: god_secret_CICADA_SUPER_ADMIN_2067
+}

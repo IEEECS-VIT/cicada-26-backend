@@ -1,12 +1,15 @@
 import { supabase } from './supabaseClient.js';
 import { supabaseLeaderboardRepository } from './supabaseLeaderboardRepository.js';
 import { IChallengeRepository } from '../interfaces/challengeRepository.js';
+import { v4 as uuidv4 } from 'uuid';
 import {
   Challenge,
   ChallengePublic,
   TeamProgress,
   CreateChallengeDto,
   UpdateChallengeDto,
+  ChallengeHint,
+  ChallengeAsset,
 } from '../../types/challenge.js';
 
 export class SupabaseChallengeRepository implements IChallengeRepository {
@@ -49,7 +52,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
   public async getPublicChallenges(): Promise<ChallengePublic[]> {
     const { data, error } = await supabase
       .from('challenges')
-      .select('id, order_number, name, story_context, assets, story_fragment, time_limit, is_active, created_at, updated_at')
+      .select('id, order_number, name, story_context, assets, story_fragment, hints, time_limit, is_active, created_at, updated_at')
       .eq('is_active', true)
       .order('order_number', { ascending: true });
 
@@ -57,11 +60,18 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
       throw new Error(`Failed to fetch active challenges: ${error.message}`);
     }
 
-    return (data || []).map((item) => ({
-      ...item,
-      assets: typeof item.assets === 'string' ? JSON.parse(item.assets) : item.assets || [],
-      story_fragment: typeof item.story_fragment === 'string' ? JSON.parse(item.story_fragment) : item.story_fragment || null,
-    })) as ChallengePublic[];
+    return (data || []).map((item) => {
+      const allHints: ChallengeHint[] = typeof item.hints === 'string'
+        ? JSON.parse(item.hints)
+        : item.hints || [];
+      const visibleHints = allHints.filter(h => h.is_visible);
+      return {
+        ...item,
+        assets: typeof item.assets === 'string' ? JSON.parse(item.assets) : item.assets || [],
+        story_fragment: typeof item.story_fragment === 'string' ? JSON.parse(item.story_fragment) : item.story_fragment || null,
+        hints: visibleHints,
+      };
+    }) as ChallengePublic[];
   }
 
   /**
@@ -70,7 +80,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
   public async getPublicChallengeByIdentifier(identifier: string | number): Promise<ChallengePublic | null> {
     let query = supabase
       .from('challenges')
-      .select('id, order_number, name, story_context, assets, story_fragment, time_limit, is_active, created_at, updated_at')
+      .select('id, order_number, name, story_context, assets, story_fragment, hints, time_limit, is_active, created_at, updated_at')
       .eq('is_active', true);
 
     if (this.isUuid(identifier)) {
@@ -91,10 +101,16 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
 
     if (!data) return null;
 
+    const allHints: ChallengeHint[] = typeof data.hints === 'string'
+      ? JSON.parse(data.hints)
+      : data.hints || [];
+    const visibleHints = allHints.filter(h => h.is_visible);
+
     return {
       ...data,
       assets: typeof data.assets === 'string' ? JSON.parse(data.assets) : data.assets || [],
       story_fragment: typeof data.story_fragment === 'string' ? JSON.parse(data.story_fragment) : data.story_fragment || null,
+      hints: visibleHints,
     } as ChallengePublic;
   }
 
@@ -126,6 +142,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
       ...data,
       assets: typeof data.assets === 'string' ? JSON.parse(data.assets) : data.assets || [],
       story_fragment: typeof data.story_fragment === 'string' ? JSON.parse(data.story_fragment) : data.story_fragment || null,
+      hints: typeof data.hints === 'string' ? JSON.parse(data.hints) : data.hints || [],
     } as Challenge;
   }
 
@@ -146,6 +163,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
       ...item,
       assets: typeof item.assets === 'string' ? JSON.parse(item.assets) : item.assets || [],
       story_fragment: typeof item.story_fragment === 'string' ? JSON.parse(item.story_fragment) : item.story_fragment || null,
+      hints: typeof item.hints === 'string' ? JSON.parse(item.hints) : item.hints || [],
     })) as Challenge[];
   }
 
@@ -159,6 +177,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
       story_context: dto.story_context || '',
       assets: dto.assets || [],
       story_fragment: dto.story_fragment || {},
+      hints: dto.hints || [],
       answer_key: dto.answer_key,
       time_limit: dto.time_limit !== undefined ? dto.time_limit : 1800,
       is_active: dto.is_active !== undefined ? dto.is_active : true,
@@ -178,6 +197,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
       ...data,
       assets: typeof data.assets === 'string' ? JSON.parse(data.assets) : data.assets || [],
       story_fragment: typeof data.story_fragment === 'string' ? JSON.parse(data.story_fragment) : data.story_fragment || null,
+      hints: typeof data.hints === 'string' ? JSON.parse(data.hints) : data.hints || [],
     } as Challenge;
   }
 
@@ -209,6 +229,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
       ...data,
       assets: typeof data.assets === 'string' ? JSON.parse(data.assets) : data.assets || [],
       story_fragment: typeof data.story_fragment === 'string' ? JSON.parse(data.story_fragment) : data.story_fragment || null,
+      hints: typeof data.hints === 'string' ? JSON.parse(data.hints) : data.hints || [],
     } as Challenge;
   }
 
@@ -246,8 +267,8 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
 
     return {
       ...data,
-      completed_challenges: typeof data.completed_challenges === 'string' 
-        ? JSON.parse(data.completed_challenges) 
+      completed_challenges: typeof data.completed_challenges === 'string'
+        ? JSON.parse(data.completed_challenges)
         : data.completed_challenges || [],
       attempts_count: data.attempts_count || 0,
       last_attempt_at: data.last_attempt_at || data.updated_at || data.created_at,
@@ -272,7 +293,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
       completed_challenges: existing?.completed_challenges || [],
       attempts_count: newCount,
       last_attempt_at: now,
-      challenge_started_at: existing?.challenge_started_at || now,
+      challenge_started_at: existing?.challenge_started_at || '1970-01-01T00:00:00.000Z',
     };
 
     const { data, error } = await supabase
@@ -287,8 +308,34 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
 
     return {
       ...data,
-      completed_challenges: typeof data.completed_challenges === 'string' 
-        ? JSON.parse(data.completed_challenges) 
+      completed_challenges: typeof data.completed_challenges === 'string'
+        ? JSON.parse(data.completed_challenges)
+        : data.completed_challenges || [],
+    } as TeamProgress;
+  }
+
+  /**
+   * Update challenge_started_at for a team
+   */
+  public async updateChallengeStartedAt(team_name: string, started_at: string | null, clientIp?: string | null): Promise<TeamProgress> {
+    const { data, error } = await supabase
+      .from('team_progress')
+      .update({ 
+        challenge_started_at: started_at,
+        started_ip: clientIp || null
+      })
+      .eq('team_name', team_name)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to update challenge started at for '${team_name}': ${error.message}`);
+    }
+
+    return {
+      ...data,
+      completed_challenges: typeof data.completed_challenges === 'string'
+        ? JSON.parse(data.completed_challenges)
         : data.completed_challenges || [],
     } as TeamProgress;
   }
@@ -308,15 +355,18 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
     const existing = await this.getTeamProgress(team_name);
     const now = new Date().toISOString();
 
+    const isNewChallenge = !existing || existing.current_challenge_order !== current_challenge_order;
+    const challenge_started_at = isNewChallenge ? '1970-01-01T00:00:00.000Z' : (existing?.challenge_started_at || '1970-01-01T00:00:00.000Z');
+    const started_ip = isNewChallenge ? null : (existing?.started_ip || null);
+
     const payload = {
       team_name,
       current_challenge_order,
       completed_challenges,
       attempts_count: attempts_count !== undefined ? attempts_count : (existing?.attempts_count || 0),
       last_attempt_at: now,
-      challenge_started_at: (existing && existing.current_challenge_order === current_challenge_order) 
-        ? existing.challenge_started_at 
-        : now,
+      challenge_started_at,
+      started_ip,
     };
 
     const { data, error } = await supabase
@@ -331,8 +381,8 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
 
     return {
       ...data,
-      completed_challenges: typeof data.completed_challenges === 'string' 
-        ? JSON.parse(data.completed_challenges) 
+      completed_challenges: typeof data.completed_challenges === 'string'
+        ? JSON.parse(data.completed_challenges)
         : data.completed_challenges || [],
     } as TeamProgress;
   }
@@ -372,7 +422,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
       completed_challenges: [],
       attempts_count: 0,
       last_attempt_at: now,
-      challenge_started_at: now,
+      challenge_started_at: '1970-01-01T00:00:00.000Z',
     };
 
     const { data, error } = await supabase
@@ -412,6 +462,241 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
     } catch {
       return [];
     }
+  }
+
+  /**
+   * Add a hint to a challenge
+   */
+  public async addHintToChallenge(challengeId: string, hintText: string, isVisible: boolean): Promise<ChallengeHint[]> {
+    const challenge = await this.getChallengeWithAnswerKey(challengeId);
+    if (!challenge) {
+      throw new Error(`Challenge '${challengeId}' not found`);
+    }
+
+    const hints = challenge.hints || [];
+    const newHint: ChallengeHint = {
+      id: uuidv4(),
+      text: hintText,
+      is_visible: isVisible,
+    };
+    hints.push(newHint);
+
+    const { error } = await supabase
+      .from('challenges')
+      .update({ hints })
+      .eq('id', challenge.id);
+
+    if (error) {
+      throw new Error(`Failed to add hint: ${error.message}`);
+    }
+
+    return hints;
+  }
+
+  /**
+   * Edit a hint in a challenge
+   */
+  public async editHintInChallenge(challengeId: string, hintId: string, hintText: string): Promise<ChallengeHint[]> {
+    const challenge = await this.getChallengeWithAnswerKey(challengeId);
+    if (!challenge) {
+      throw new Error(`Challenge '${challengeId}' not found`);
+    }
+
+    const hints = challenge.hints || [];
+    const hint = hints.find((h) => h.id === hintId);
+    if (!hint) {
+      throw new Error(`Hint '${hintId}' not found in challenge '${challengeId}'`);
+    }
+
+    hint.text = hintText;
+
+    const { error } = await supabase
+      .from('challenges')
+      .update({ hints })
+      .eq('id', challenge.id);
+
+    if (error) {
+      throw new Error(`Failed to update hint: ${error.message}`);
+    }
+
+    return hints;
+  }
+
+  /**
+   * Delete a hint from a challenge
+   */
+  public async deleteHintFromChallenge(challengeId: string, hintId: string): Promise<ChallengeHint[]> {
+    const challenge = await this.getChallengeWithAnswerKey(challengeId);
+    if (!challenge) {
+      throw new Error(`Challenge '${challengeId}' not found`);
+    }
+
+    const hints = challenge.hints || [];
+    const updatedHints = hints.filter((h) => h.id !== hintId);
+
+    if (hints.length === updatedHints.length) {
+      throw new Error(`Hint '${hintId}' not found in challenge '${challengeId}'`);
+    }
+
+    const { error } = await supabase
+      .from('challenges')
+      .update({ hints: updatedHints })
+      .eq('id', challenge.id);
+
+    if (error) {
+      throw new Error(`Failed to delete hint: ${error.message}`);
+    }
+
+    return updatedHints;
+  }
+
+  /**
+   * Toggle hint visibility
+   */
+  public async toggleHintVisibility(challengeId: string, hintId: string): Promise<ChallengeHint[]> {
+    const challenge = await this.getChallengeWithAnswerKey(challengeId);
+    if (!challenge) {
+      throw new Error(`Challenge '${challengeId}' not found`);
+    }
+
+    const hints = challenge.hints || [];
+    const hint = hints.find((h) => h.id === hintId);
+    if (!hint) {
+      throw new Error(`Hint '${hintId}' not found in challenge '${challengeId}'`);
+    }
+
+    hint.is_visible = !hint.is_visible;
+
+    const { error } = await supabase
+      .from('challenges')
+      .update({ hints })
+      .eq('id', challenge.id);
+
+    if (error) {
+      throw new Error(`Failed to toggle hint visibility: ${error.message}`);
+    }
+
+    return hints;
+  }
+
+  /**
+   * Add an asset to a challenge
+   */
+  public async addAssetToChallenge(challengeId: string, asset: Omit<ChallengeAsset, 'id'> & { id?: string }): Promise<ChallengeAsset[]> {
+    const challenge = await this.getChallengeWithAnswerKey(challengeId);
+    if (!challenge) {
+      throw new Error(`Challenge '${challengeId}' not found`);
+    }
+
+    const assets = challenge.assets || [];
+    const newAsset: ChallengeAsset = {
+      ...asset,
+      id: asset.id || uuidv4(),
+    };
+    assets.push(newAsset);
+
+    const { error } = await supabase
+      .from('challenges')
+      .update({ assets })
+      .eq('id', challenge.id);
+
+    if (error) {
+      throw new Error(`Failed to add asset: ${error.message}`);
+    }
+
+    return assets;
+  }
+
+  /**
+   * Edit/Replace an asset in a challenge
+   */
+  public async editAssetInChallenge(challengeId: string, assetId: string, updatedAsset: Partial<ChallengeAsset>): Promise<ChallengeAsset[]> {
+    const challenge = await this.getChallengeWithAnswerKey(challengeId);
+    if (!challenge) {
+      throw new Error(`Challenge '${challengeId}' not found`);
+    }
+
+    const assets = challenge.assets || [];
+    
+    // Find asset by id, name, or index fallback
+    let assetIndex = assets.findIndex((a) => a.id === assetId);
+    if (assetIndex === -1) {
+      assetIndex = assets.findIndex((a) => a.name && a.name.toLowerCase() === assetId.toLowerCase());
+    }
+    if (assetIndex === -1 && /^\d+$/.test(assetId)) {
+      const idx = parseInt(assetId, 10);
+      if (idx >= 0 && idx < assets.length) {
+        assetIndex = idx;
+      }
+    }
+
+    if (assetIndex === -1) {
+      throw new Error(`Asset '${assetId}' not found in challenge '${challengeId}'`);
+    }
+
+    // Merge properties (preserving id if already set, or generating one)
+    const existingAsset = assets[assetIndex];
+    if (!existingAsset) {
+      throw new Error(`Asset '${assetId}' not found at index ${assetIndex}`);
+    }
+
+    assets[assetIndex] = {
+      ...existingAsset,
+      ...updatedAsset,
+      id: existingAsset.id || uuidv4(),
+    } as ChallengeAsset;
+
+    const { error } = await supabase
+      .from('challenges')
+      .update({ assets })
+      .eq('id', challenge.id);
+
+    if (error) {
+      throw new Error(`Failed to update asset: ${error.message}`);
+    }
+
+    return assets;
+  }
+
+  /**
+   * Delete an asset from a challenge
+   */
+  public async deleteAssetFromChallenge(challengeId: string, assetId: string): Promise<ChallengeAsset[]> {
+    const challenge = await this.getChallengeWithAnswerKey(challengeId);
+    if (!challenge) {
+      throw new Error(`Challenge '${challengeId}' not found`);
+    }
+
+    const assets = challenge.assets || [];
+    
+    // Find asset by id, name, or index fallback to remove
+    let assetIndex = assets.findIndex((a) => a.id === assetId);
+    if (assetIndex === -1) {
+      assetIndex = assets.findIndex((a) => a.name && a.name.toLowerCase() === assetId.toLowerCase());
+    }
+    if (assetIndex === -1 && /^\d+$/.test(assetId)) {
+      const idx = parseInt(assetId, 10);
+      if (idx >= 0 && idx < assets.length) {
+        assetIndex = idx;
+      }
+    }
+
+    if (assetIndex === -1) {
+      throw new Error(`Asset '${assetId}' not found in challenge '${challengeId}'`);
+    }
+
+    const updatedAssets = assets.filter((_, idx) => idx !== assetIndex);
+
+    const { error } = await supabase
+      .from('challenges')
+      .update({ assets: updatedAssets })
+      .eq('id', challenge.id);
+
+    if (error) {
+      throw new Error(`Failed to delete asset: ${error.message}`);
+    }
+
+    return updatedAssets;
   }
 }
 

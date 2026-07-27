@@ -13,10 +13,38 @@ import {
   AdminTeamProgressSummary,
   StoryFragment,
   TeamProgress,
+  ChallengeHint,
+  ChallengeAsset,
 } from '../types/challenge.js';
 
 const isBcryptHash = (str: string): boolean => {
   return /^\$[2ayb]\$[0-9]{2}\$[./A-Za-z0-9]{53}$/.test(str);
+};
+
+const isStartedAtPlaceholder = (dateStr: string | null | undefined): boolean => {
+  if (!dateStr) return true;
+  const time = new Date(dateStr).getTime();
+  return isNaN(time) || time <= 86400000; // less than 1 day from epoch (allows 1970-01-01)
+};
+
+const toISTString = (dateStr: string | null | undefined, fallback: string = ''): string => {
+  if (!dateStr) return fallback;
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return fallback;
+  const istOffsetMs = 5.5 * 60 * 60 * 1000;
+  const istDate = new Date(date.getTime() + istOffsetMs);
+  const iso = istDate.toISOString();
+  return iso.replace('Z', '+05:30');
+};
+
+const toISTStringNullable = (dateStr: string | null | undefined): string | null | undefined => {
+  if (!dateStr) return dateStr;
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  const istOffsetMs = 5.5 * 60 * 60 * 1000;
+  const istDate = new Date(date.getTime() + istOffsetMs);
+  const iso = istDate.toISOString();
+  return iso.replace('Z', '+05:30');
 };
 
 export class ChallengeService {
@@ -25,11 +53,28 @@ export class ChallengeService {
     private leaderboardRepo: SupabaseLeaderboardRepository = supabaseLeaderboardRepository
   ) {}
 
+  private maskChallengeAssets(challenge: ChallengePublic): ChallengePublic {
+    if (!challenge.assets) return challenge;
+    const maskedAssets = challenge.assets.map((asset, index) => {
+      if (asset.url) {
+        return {
+          ...asset,
+          url: `/api/challenges/assets/masked?c=${challenge.id}&i=${index}`,
+        };
+      }
+      return asset;
+    });
+    return {
+      ...challenge,
+      assets: maskedAssets,
+    };
+  }
+
   /**
    * Get all active public challenges (without answer keys)
    * Optionally annotates is_locked status if team_name is provided
    */
-  public async getPublicChallenges(team_name?: string): Promise<ChallengePublic[]> {
+  public async getPublicChallenges(team_name?: string, clientIp?: string): Promise<ChallengePublic[]> {
     const challenges = await this.challengeRepo.getPublicChallenges();
     let currentOrder = 1;
     let progress: any = null;
@@ -39,6 +84,16 @@ export class ChallengeService {
         progress = await this.challengeRepo.upsertTeamProgress(team_name.trim(), 1, []);
       }
       currentOrder = progress?.current_challenge_order || 1;
+
+      // IP Tracking mismatch check
+      if (progress && progress.started_ip && clientIp && progress.started_ip !== clientIp) {
+        throw new Error(`IP_MISMATCH:${progress.started_ip}`);
+      }
+
+      if (progress && isStartedAtPlaceholder(progress.challenge_started_at)) {
+        const nowStr = new Date().toISOString();
+        progress = await this.challengeRepo.updateChallengeStartedAt(team_name.trim(), nowStr, clientIp);
+      }
     }
 
     return challenges.map((item) => {
@@ -54,18 +109,29 @@ export class ChallengeService {
           story_context: undefined,
           assets: undefined,
           story_fragment: undefined,
+          hints: undefined, // Explicitly mask hints for locked challenges
         } as unknown as ChallengePublic;
       }
-      return {
+      const challenge_started_at = item.order_number === currentOrder && progress ? progress.challenge_started_at : undefined;
+      const startVal = (item.order_number === currentOrder && progress && progress.challenge_started_at && !isStartedAtPlaceholder(progress.challenge_started_at))
+        ? progress.challenge_started_at
+        : undefined;
+
+      const publicChallenge = {
         ...item,
         is_locked: false,
         time_limit: item.time_limit || 1800,
-        challenge_started_at: item.order_number === currentOrder && progress ? progress.challenge_started_at : undefined
+        hints: (item.hints || []).filter((h: any) => h.is_visible), // Service boundary visibility check (security filter)
+        challenge_started_at: toISTStringNullable(challenge_started_at) || null,
+        created_at: toISTString(startVal || item.created_at, item.created_at),
+        updated_at: toISTString(startVal || item.updated_at, item.updated_at)
       };
+
+      return this.maskChallengeAssets(publicChallenge);
     });
   }
 
-  public async getPublicChallenge(identifier: string | number, team_name?: string): Promise<ChallengePublic | null> {
+  public async getPublicChallenge(identifier: string | number, team_name?: string, clientIp?: string): Promise<ChallengePublic | null> {
     const challenge = await this.challengeRepo.getPublicChallengeByIdentifier(identifier);
     if (!challenge) return null;
 
@@ -77,9 +143,18 @@ export class ChallengeService {
         progress = await this.challengeRepo.upsertTeamProgress(team_name.trim(), 1, []);
       }
       currentOrder = progress?.current_challenge_order || 1;
+
+      // IP Tracking mismatch check
+      if (progress && progress.started_ip && clientIp && progress.started_ip !== clientIp) {
+        throw new Error(`IP_MISMATCH:${progress.started_ip}`);
+      }
     }
 
     const isLocked = challenge.order_number > currentOrder;
+    if (!isLocked && team_name && team_name.trim() && progress && isStartedAtPlaceholder(progress.challenge_started_at) && challenge.order_number === currentOrder) {
+      const nowStr = new Date().toISOString();
+      progress = await this.challengeRepo.updateChallengeStartedAt(team_name.trim(), nowStr, clientIp);
+    }
     if (isLocked) {
       return {
         id: challenge.id,
@@ -91,15 +166,26 @@ export class ChallengeService {
         story_context: undefined,
         assets: undefined,
         story_fragment: undefined,
+        hints: undefined, // Explicitly mask hints for locked challenges
       } as unknown as ChallengePublic;
     }
 
-    return {
+    const challenge_started_at = challenge.order_number === currentOrder && progress ? progress.challenge_started_at : undefined;
+    const startVal = (challenge.order_number === currentOrder && progress && progress.challenge_started_at && !isStartedAtPlaceholder(progress.challenge_started_at))
+      ? progress.challenge_started_at
+      : undefined;
+
+    const publicChallenge = {
       ...challenge,
       is_locked: false,
       time_limit: challenge.time_limit || 1800,
-      challenge_started_at: challenge.order_number === currentOrder && progress ? progress.challenge_started_at : undefined
+      hints: (challenge.hints || []).filter((h: any) => h.is_visible), // Service boundary visibility check (security filter)
+      challenge_started_at: toISTStringNullable(challenge_started_at) || null,
+      created_at: toISTString(startVal || challenge.created_at, challenge.created_at),
+      updated_at: toISTString(startVal || challenge.updated_at, challenge.updated_at)
     };
+
+    return this.maskChallengeAssets(publicChallenge);
   }
 
   /**
@@ -110,7 +196,7 @@ export class ChallengeService {
    * 4. On correct answer -> Update Leaderboard FIRST, then unlock next challenge & team progress
    * 5. On incorrect answer -> Return "Incorrect Authentication Key" (No info leakage)
    */
-  public async submitAnswer(dto: SubmitAnswerDto): Promise<SubmitAnswerResult> {
+  public async submitAnswer(dto: SubmitAnswerDto, clientIp?: string): Promise<SubmitAnswerResult> {
     const { team_name, challenge_identifier, answer } = dto;
 
     if (!team_name || !team_name.trim()) {
@@ -121,17 +207,32 @@ export class ChallengeService {
       throw new Error('Answer is required');
     }
 
+    // Fetch team progress to check current unlocked challenge order
+    let existingProgress = await this.challengeRepo.getTeamProgress(team_name.trim());
+
+    // IP Tracking mismatch check
+    if (existingProgress && existingProgress.started_ip && clientIp && existingProgress.started_ip !== clientIp) {
+      return {
+        success: false,
+        message: `Access Denied: Answer submission must come from the same IP address that activated the challenge.`,
+        tryAgain: false,
+      };
+    }
+
     // Always record attempt count for the team
     await this.challengeRepo.recordAttempt(team_name.trim());
 
-    // Fetch team progress to check current unlocked challenge order
-    const existingProgress = await this.challengeRepo.getTeamProgress(team_name.trim());
     const currentUnlockedOrder = existingProgress?.current_challenge_order || 1;
 
     // Fetch challenge with answer key
     const challenge = await this.challengeRepo.getChallengeWithAnswerKey(challenge_identifier);
     if (!challenge) {
       throw new Error(`Challenge '${challenge_identifier}' not found`);
+    }
+
+    if (existingProgress && isStartedAtPlaceholder(existingProgress.challenge_started_at)) {
+      const nowStr = new Date().toISOString();
+      existingProgress = await this.challengeRepo.updateChallengeStartedAt(team_name.trim(), nowStr, clientIp);
     }
 
     // Verify time limit/timeout
@@ -384,6 +485,61 @@ export class ChallengeService {
 
   public async getSubmissionLogs(limit?: number, team_name?: string): Promise<any[]> {
     return this.challengeRepo.getSubmissionLogs(limit, team_name);
+  }
+
+  /**
+   * Admin: Add a hint to a challenge
+   */
+  public async addHintToChallenge(challengeId: string, hintText: string, isVisible: boolean): Promise<ChallengeHint[]> {
+    if (!hintText || !hintText.trim()) {
+      throw new Error('Hint text is required');
+    }
+    return this.challengeRepo.addHintToChallenge(challengeId, hintText.trim(), isVisible);
+  }
+
+  /**
+   * Admin: Edit a hint in a challenge
+   */
+  public async editHintInChallenge(challengeId: string, hintId: string, hintText: string): Promise<ChallengeHint[]> {
+    if (!hintText || !hintText.trim()) {
+      throw new Error('Hint text is required');
+    }
+    return this.challengeRepo.editHintInChallenge(challengeId, hintId, hintText.trim());
+  }
+
+  /**
+   * Admin: Delete a hint from a challenge
+   */
+  public async deleteHintFromChallenge(challengeId: string, hintId: string): Promise<ChallengeHint[]> {
+    return this.challengeRepo.deleteHintFromChallenge(challengeId, hintId);
+  }
+
+  /**
+   * Admin: Toggle hint visibility
+   */
+  public async toggleHintVisibility(challengeId: string, hintId: string): Promise<ChallengeHint[]> {
+    return this.challengeRepo.toggleHintVisibility(challengeId, hintId);
+  }
+
+  /**
+   * Admin: Add an asset to a challenge
+   */
+  public async addAssetToChallenge(challengeId: string, asset: Omit<ChallengeAsset, 'id'> & { id?: string }): Promise<ChallengeAsset[]> {
+    return this.challengeRepo.addAssetToChallenge(challengeId, asset);
+  }
+
+  /**
+   * Admin: Edit/Replace an asset in a challenge
+   */
+  public async editAssetInChallenge(challengeId: string, assetId: string, updatedAsset: Partial<ChallengeAsset>): Promise<ChallengeAsset[]> {
+    return this.challengeRepo.editAssetInChallenge(challengeId, assetId, updatedAsset);
+  }
+
+  /**
+   * Admin: Delete an asset from a challenge
+   */
+  public async deleteAssetFromChallenge(challengeId: string, assetId: string): Promise<ChallengeAsset[]> {
+    return this.challengeRepo.deleteAssetFromChallenge(challengeId, assetId);
   }
 }
 

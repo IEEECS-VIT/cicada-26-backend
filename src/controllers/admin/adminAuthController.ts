@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import db from '../../db.js';
+import { logAdminActivity } from '../../services/auditLogger.js';
 
 export class AdminAuthController {
   /**
@@ -10,8 +11,8 @@ export class AdminAuthController {
   static async toggleRole(req: Request, res: Response): Promise<void> {
     const { target_user_id, target_email, role } = req.body;
     try {
-      if (role !== 'admin' && role !== 'participant') {
-        res.status(400).json({ success: false, error: 'Invalid role specified. Allowed values: "admin", "participant"' });
+      if (role !== 'admin' && role !== 'participant' && role !== 'GOD') {
+        res.status(400).json({ success: false, error: 'Invalid role specified. Allowed values: "admin", "participant", "GOD"' });
         return;
       }
 
@@ -31,6 +32,8 @@ export class AdminAuthController {
       }
 
       await db.users.updateRole(targetId, role);
+      await logAdminActivity(req, 'TOGGLE_ROLE', { target_user_id: targetId, role });
+
       res.json({ success: true, message: `User '${targetId}' role updated to '${role}' successfully!` });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -60,6 +63,8 @@ export class AdminAuthController {
       }
 
       await db.users.approveAdmin(targetId);
+      await logAdminActivity(req, 'APPROVE_ADMIN', { target_user_id: targetId });
+
       res.json({
         success: true,
         message: `Admin user '${targetId}' has been approved and granted admin access!`,
@@ -105,6 +110,8 @@ export class AdminAuthController {
       }
 
       await db.users.deleteUser(targetId);
+      await logAdminActivity(req, 'DELETE_USER', { target_user_id: targetId });
+
       res.json({
         success: true,
         message: `User '${targetId}' deleted successfully from database!`,
@@ -220,6 +227,8 @@ export class AdminAuthController {
           details.push({ email: rec.email, status: 'error', message: itemErr.message });
         }
       }
+
+      await logAdminActivity(req, 'BULK_IMPORT_ADMINS', { total: records.length, created: createdCount, updated: updatedCount });
 
       res.status(200).json({
         success: true,

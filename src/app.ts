@@ -13,6 +13,10 @@ import adminTeamRoutes from './routes/admin/teamRoutes.js';
 import adminChallengeRoutes from './routes/admin/challengeRoutes.js';
 import adminLeaderboardRoutes from './routes/admin/leaderboardRoutes.js';
 
+// Super Admin (GOD) Routes
+import godAuthRoutes from './routes/god/authRoutes.js';
+import godLogRoutes from './routes/god/logRoutes.js';
+
 const app: Express = express();
 
 // Middlewares
@@ -52,6 +56,11 @@ app.use('/api/admin/auth', adminAuthRoutes);
 app.use('/api/admin/teams', adminTeamRoutes);
 app.use('/api/admin/challenges', adminChallengeRoutes);
 app.use('/api/admin/leaderboard', adminLeaderboardRoutes);
+
+// Super Admin (GOD) API Routes
+app.use('/api/god/auth', godAuthRoutes);
+app.use('/api/god/logs', godLogRoutes);
+app.use('/api/god', godAuthRoutes);
 
 // Legacy/Compatibility Aliases for Root Admin Paths
 app.use('/api/admin', adminAuthRoutes);

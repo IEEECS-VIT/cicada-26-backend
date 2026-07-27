@@ -1,11 +1,15 @@
 meta {
   name: Get Participant Progress & Resume
   type: http
-  seq: 6
+  seq: 3
 }
 
 get {
   url: {{baseUrl}}/api/challenges/progress?team_name=CyberKnights
   body: none
   auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
 }
