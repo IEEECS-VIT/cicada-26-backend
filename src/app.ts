@@ -31,7 +31,32 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Health Checks
+// Health Checks & Root Directory Handlers
+app.get('/', (req: Request, res: Response) => {
+  res.status(200).json({
+    success: true,
+    service: 'Cicada 2067 Backend API',
+    status: 'UP',
+    documentation: '/api/health',
+    message: 'Welcome to the Cicada 2067 Interstellar Cryptic Hunt API.',
+  });
+});
+
+app.get('/api', (req: Request, res: Response) => {
+  res.status(200).json({
+    success: true,
+    service: 'Cicada 2067 Backend API',
+    status: 'UP',
+    endpoints: {
+      health: '/api/health',
+      auth: '/api/auth/login',
+      challenges: '/api/challenges',
+      leaderboard: '/api/leaderboard',
+      teams: '/api/teams',
+    },
+  });
+});
+
 app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({
     status: 'UP',
@@ -43,6 +68,7 @@ app.get('/health', (req: Request, res: Response) => {
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', message: 'Cicada 2067 Backend is live and Database Agnostic!' });
 });
+
 
 // User API Routes
 app.use('/api/auth', userAuthRoutes);
