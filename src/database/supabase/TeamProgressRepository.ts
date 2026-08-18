@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { ITeamProgressRepository, TeamProgress } from '../interfaces';
+import { ITeamProgressRepository, TeamProgress } from '../../repositories/interfaces.js';
 
 export class SupabaseTeamProgressRepository implements ITeamProgressRepository {
   private supabase: SupabaseClient;

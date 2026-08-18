@@ -1,8 +1,36 @@
 import { Request, Response, NextFunction } from 'express';
 import db, { supabase } from '../db.js';
 
+export interface SessionData {
+  email: string;
+  lastActive: number;
+}
+
 // Simple in-memory session store
-export const activeSessions = new Map<string, string>(); // token -> email
+export const activeSessions = new Map<string, SessionData>(); // token -> SessionData
+
+export const checkCookieSession = async (
+  req: Request,
+  res: Response
+): Promise<{ valid: boolean; email?: string; expired?: boolean }> => {
+  const sessionToken = getCookie(req, 'session_token');
+  if (!sessionToken) {
+    return { valid: false };
+  }
+  const session = activeSessions.get(sessionToken);
+  if (!session) {
+    return { valid: false };
+  }
+  const now = Date.now();
+  const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutes in milliseconds
+  if (now - session.lastActive > INACTIVITY_LIMIT) {
+    activeSessions.delete(sessionToken);
+    res.clearCookie('session_token');
+    return { valid: false, expired: true };
+  }
+  session.lastActive = now;
+  return { valid: true, email: session.email };
+};
 
 export const getCookie = (req: Request, name: string): string | undefined => {
   const cookieHeader = req.headers.cookie;
@@ -30,9 +58,16 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     // Check Session Token Cookie
     const sessionToken = getCookie(req, 'session_token');
     if (sessionToken) {
-      const email = activeSessions.get(sessionToken);
-      if (email) {
-        const dbUser = await db.users.findByEmail(email);
+      const sessionResult = await checkCookieSession(req, res);
+      if (sessionResult.expired) {
+        res.status(401).json({
+          success: false,
+          error: 'Session expired due to inactivity. Please log in again.',
+        });
+        return;
+      }
+      if (sessionResult.valid && sessionResult.email) {
+        const dbUser = await db.users.findByEmail(sessionResult.email);
         if (dbUser) {
           (req as any).user = dbUser;
           return next();
@@ -100,10 +135,18 @@ export const requireAdmin = async (req: Request, res: Response, next: NextFuncti
     // Check Session Token Cookie
     const sessionToken = getCookie(req, 'session_token');
     if (sessionToken) {
-      const email = activeSessions.get(sessionToken);
-      if (email) {
-        const dbUser = await db.users.findByEmail(email);
+      const sessionResult = await checkCookieSession(req, res);
+      if (sessionResult.expired) {
+        res.status(401).json({
+          success: false,
+          error: 'Session expired due to inactivity. Please log in again.',
+        });
+        return;
+      }
+      if (sessionResult.valid && sessionResult.email) {
+        const dbUser = await db.users.findByEmail(sessionResult.email);
         if (dbUser && (dbUser.role === 'admin' || dbUser.role === 'GOD') && dbUser.is_admin_approved !== false) {
+          (req as any).user = dbUser;
           return next();
         }
       }
@@ -162,10 +205,18 @@ export const requireGod = async (req: Request, res: Response, next: NextFunction
     // Check Session Token Cookie
     const sessionToken = getCookie(req, 'session_token');
     if (sessionToken) {
-      const email = activeSessions.get(sessionToken);
-      if (email) {
-        const dbUser = await db.users.findByEmail(email);
+      const sessionResult = await checkCookieSession(req, res);
+      if (sessionResult.expired) {
+        res.status(401).json({
+          success: false,
+          error: 'Session expired due to inactivity. Please log in again.',
+        });
+        return;
+      }
+      if (sessionResult.valid && sessionResult.email) {
+        const dbUser = await db.users.findByEmail(sessionResult.email);
         if (dbUser && dbUser.role === 'GOD') {
+          (req as any).user = dbUser;
           return next();
         }
       }

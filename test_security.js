@@ -1,6 +1,6 @@
 const http = require('http');
 
-const PORT = 5000;
+const PORT = 5010;
 
 // Helper to make requests
 function makeRequest(options, postData = null) {
@@ -38,7 +38,7 @@ async function runTests() {
   console.log('Test 1: Verifying cache-disabling headers on /health...');
   try {
     const res = await makeRequest({
-      hostname: 'localhost',
+      hostname: '127.0.0.1',
       port: PORT,
       path: '/health',
       method: 'GET'
@@ -63,7 +63,7 @@ async function runTests() {
   try {
     // List active challenges first to find a locked one or fallback
     const listRes = await makeRequest({
-      hostname: 'localhost',
+      hostname: '127.0.0.1',
       port: PORT,
       path: '/api/challenges?team_name=rate_limit_tester_team',
       method: 'GET'
@@ -79,7 +79,7 @@ async function runTests() {
 
     console.log(`- Fetching challenge details for identifier: ${targetIdentifier}...`);
     const res = await makeRequest({
-      hostname: 'localhost',
+      hostname: '127.0.0.1',
       port: PORT,
       path: `/api/challenges/${targetIdentifier}?team_name=rate_limit_tester_team`,
       method: 'GET'
@@ -113,7 +113,7 @@ async function runTests() {
   console.log('Test 3: Testing submission rate limiter (5 requests/minute limit)...');
   try {
     const postOptions = {
-      hostname: 'localhost',
+      hostname: '127.0.0.1',
       port: PORT,
       path: '/api/challenges/submit',
       method: 'POST'

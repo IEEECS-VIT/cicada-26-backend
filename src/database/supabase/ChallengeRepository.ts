@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { IChallengeRepository, Challenge } from '../interfaces';
+import { IChallengeRepository, Challenge } from '../../repositories/interfaces.js';
 
 export class SupabaseChallengeRepository implements IChallengeRepository {
   private supabase: SupabaseClient;

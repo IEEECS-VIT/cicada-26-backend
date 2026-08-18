@@ -1,11 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
-import { SupabaseUserRepository } from './repositories/supabase/UserRepository.js';
-import { SupabaseTeamRepository } from './repositories/supabase/TeamRepository.js';
-import { SupabaseChallengeRepository } from './repositories/supabase/ChallengeRepository.js';
-import { SupabaseTeamProgressRepository } from './repositories/supabase/TeamProgressRepository.js';
-import { SupabaseSubmissionLogRepository } from './repositories/supabase/SubmissionLogRepository.js';
-import { SupabaseAdminLogRepository } from './repositories/supabase/AdminLogRepository.js';
+import { SupabaseUserRepository } from './database/supabase/UserRepository.js';
+import { SupabaseTeamRepository } from './database/supabase/TeamRepository.js';
+import { SupabaseChallengeRepository } from './database/supabase/ChallengeRepository.js';
+import { SupabaseTeamProgressRepository } from './database/supabase/TeamProgressRepository.js';
+import { SupabaseSubmissionLogRepository } from './database/supabase/SubmissionLogRepository.js';
+import { SupabaseAdminLogRepository } from './database/supabase/AdminLogRepository.js';
 import { IUserRepository, ITeamRepository, IChallengeRepository, ITeamProgressRepository, ISubmissionLogRepository, IAdminLogRepository } from './repositories/interfaces.js';
 
 dotenv.config();

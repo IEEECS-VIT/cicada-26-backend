@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { ISubmissionLogRepository } from '../interfaces';
+import { ISubmissionLogRepository } from '../../repositories/interfaces.js';
 
 export class SupabaseSubmissionLogRepository implements ISubmissionLogRepository {
   private supabase: SupabaseClient;
