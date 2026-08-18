@@ -1,31 +1,37 @@
 import { Request, Response } from 'express';
-import { v4 as uuidv4 } from 'uuid';
 import db from '../../db.js';
-
-const generateInviteCode = () => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < 6; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-};
 
 export class UserTeamController {
   /**
    * POST /api/teams/create
+   * Creates a new team. User identity comes from req.user (set by requireAuth middleware).
+   * user_id from the request body is IGNORED — we use the authenticated user's ID.
    */
   static async createTeam(req: Request, res: Response): Promise<void> {
-    const { user_id, team_name } = req.body;
+    const { team_name } = req.body;
     try {
-      const user = await db.users.findById(user_id);
-      if (!user) throw new Error('User not found.');
-      if (user.team_id) throw new Error('You are already in a team. You cannot create another one.');
+      // CHANGE 3+4: Use authenticated user from middleware — never trust body user_id
+      const user = (req as any).user;
+      if (!user) {
+        res.status(401).json({ success: false, error: 'Unauthorized: Authentication required.' });
+        return;
+      }
 
+      if (!team_name || !team_name.trim()) {
+        res.status(400).json({ success: false, error: 'team_name is required.' });
+        return;
+      }
+
+      if (user.team_id) {
+        res.status(400).json({ success: false, error: 'You are already in a team. You cannot create another one.' });
+        return;
+      }
+
+      const { v4: uuidv4 } = await import('uuid');
       const team_id = uuidv4();
       const invite_code = generateInviteCode();
 
-      await db.teams.createTeamAndJoin(user.id, team_name, invite_code, team_id);
+      await db.teams.createTeamAndJoin(user.id, team_name.trim(), invite_code, team_id);
 
       res.json({
         success: true,
@@ -40,19 +46,39 @@ export class UserTeamController {
 
   /**
    * POST /api/teams/join
+   * Join a team via invite code. User identity comes from req.user.
    */
   static async joinTeam(req: Request, res: Response): Promise<void> {
-    const { user_id, invite_code } = req.body;
+    const { invite_code } = req.body;
     try {
-      const user = await db.users.findById(user_id);
-      if (!user) throw new Error('User not found.');
-      if (user.team_id) throw new Error('You are already in a team. You cannot join another one.');
+      // CHANGE 3+4: Use authenticated user from middleware
+      const user = (req as any).user;
+      if (!user) {
+        res.status(401).json({ success: false, error: 'Unauthorized: Authentication required.' });
+        return;
+      }
 
-      const team = await db.teams.findByInviteCode(invite_code.toUpperCase());
-      if (!team) throw new Error('Invalid invite code.');
+      if (!invite_code || !invite_code.trim()) {
+        res.status(400).json({ success: false, error: 'invite_code is required.' });
+        return;
+      }
+
+      if (user.team_id) {
+        res.status(400).json({ success: false, error: 'You are already in a team. You cannot join another one.' });
+        return;
+      }
+
+      const team = await db.teams.findByInviteCode(invite_code.toUpperCase().trim());
+      if (!team) {
+        res.status(404).json({ success: false, error: 'Invalid invite code. No team found.' });
+        return;
+      }
 
       const membersCount = await db.teams.countMembers(team.id);
-      if (membersCount >= 5) throw new Error('This team is already full (maximum 5 members).');
+      if (membersCount >= 5) {
+        res.status(400).json({ success: false, error: 'This team is already full (maximum 5 members).' });
+        return;
+      }
 
       await db.users.updateTeam(user.id, team.id);
 
@@ -64,21 +90,42 @@ export class UserTeamController {
 
   /**
    * POST /api/teams/update-name
+   * Update team name. Only the team leader can do this.
+   * Ownership verified via req.user.team_id and team.leader_id — no body trust.
    */
   static async updateTeamName(req: Request, res: Response): Promise<void> {
-    const { user_id, team_id, new_team_name } = req.body;
+    const { new_team_name } = req.body;
     try {
-      const team = await db.teams.findById(team_id);
+      // CHANGE 3+4: Use authenticated user — ignore body user_id/team_id
+      const user = (req as any).user;
+      if (!user) {
+        res.status(401).json({ success: false, error: 'Unauthorized: Authentication required.' });
+        return;
+      }
+
+      if (!new_team_name || !new_team_name.trim()) {
+        res.status(400).json({ success: false, error: 'new_team_name is required.' });
+        return;
+      }
+
+      if (!user.team_id) {
+        res.status(400).json({ success: false, error: 'You are not currently in a team.' });
+        return;
+      }
+
+      // CHANGE 4: Verify ownership — only team leader can rename
+      const team = await db.teams.findById(user.team_id);
       if (!team) {
         res.status(404).json({ success: false, error: 'Team not found.' });
         return;
       }
-      if (team.leader_id !== user_id) {
-        res.status(403).json({ success: false, error: 'Forbidden: Only the team leader can change the name.' });
+
+      if (team.leader_id !== user.id) {
+        res.status(403).json({ success: false, error: 'Forbidden: Only the team leader can change the team name.' });
         return;
       }
 
-      await db.teams.updateName(team_id, new_team_name);
+      await db.teams.updateName(user.team_id, new_team_name.trim());
       res.json({ success: true, message: 'Team name updated successfully!' });
     } catch (err: any) {
       res.status(400).json({ success: false, error: err.message });
@@ -87,45 +134,38 @@ export class UserTeamController {
 
   /**
    * POST /api/teams/leave
-   * Participant route for leaving a team.
-   * CONSTRAINT: Team Leader CANNOT leave the team.
+   * Leave current team. Team leaders cannot leave.
+   * Ownership verified via req.user — no body user_id trust.
    */
   static async leaveTeam(req: Request, res: Response): Promise<void> {
-    const { user_id, team_id: paramTeamId } = req.body;
     try {
-      if (!user_id) {
-        res.status(400).json({ success: false, error: 'user_id is required.' });
-        return;
-      }
-
-      const user = await db.users.findById(user_id);
+      // CHANGE 3+4: Use authenticated user — ignore body user_id
+      const user = (req as any).user;
       if (!user) {
-        res.status(404).json({ success: false, error: 'User not found.' });
+        res.status(401).json({ success: false, error: 'Unauthorized: Authentication required.' });
         return;
       }
 
-      const targetTeamId = user.team_id || paramTeamId;
-      if (!targetTeamId) {
-        res.status(400).json({ success: false, error: 'User is not currently in any team.' });
+      if (!user.team_id) {
+        res.status(400).json({ success: false, error: 'You are not currently in any team.' });
         return;
       }
 
-      const team = await db.teams.findById(targetTeamId);
+      // CHANGE 4: Verify team exists and check leadership
+      const team = await db.teams.findById(user.team_id);
       if (!team) {
         res.status(404).json({ success: false, error: 'Team not found.' });
         return;
       }
 
-      // CONSTRAINT CHECK: Leader cannot leave team
       if (team.leader_id === user.id) {
         res.status(400).json({
           success: false,
-          error: 'Team leader cannot leave the team. Leadership must be transferred or the team must be deleted by an admin.',
+          error: 'Team leader cannot leave the team. Transfer leadership or contact an admin to dissolve the team.',
         });
         return;
       }
 
-      // Remove non-leader member from team
       await db.teams.removeMember(user.id, team.id);
       res.json({ success: true, message: 'Successfully left the team.' });
     } catch (err: any) {
@@ -133,3 +173,12 @@ export class UserTeamController {
     }
   }
 }
+
+const generateInviteCode = () => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
