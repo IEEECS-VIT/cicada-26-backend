@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import db, { supabase } from '../../db.js';
+import db, { supabaseAnon } from '../../db.js';
 import { activeSessions } from '../../middleware/authMiddleware.js';
 
 const SESSION_TTL_MS = (parseInt(process.env.SESSION_TTL_MINUTES || '30', 10)) * 60 * 1000;
@@ -50,7 +50,7 @@ export class UserAuthController {
         return;
       }
 
-      const { data: { user: authUser }, error } = await supabase.auth.getUser(access_token);
+      const { data: { user: authUser }, error } = await supabaseAnon.auth.getUser(access_token);
       if (error || !authUser || !authUser.email) {
         res.status(401).json({ success: false, error: 'Invalid or expired Supabase access token.' });
         return;
