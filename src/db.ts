@@ -10,8 +10,18 @@ import { IUserRepository, ITeamRepository, IChallengeRepository, ITeamProgressRe
 
 dotenv.config();
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://fdzcrmwwjpfwntbakied.supabase.co';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
+// ---------------------------------------------------------------------------
+// Startup guard — fail fast if critical env vars are missing
+// ---------------------------------------------------------------------------
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+
+if (!supabaseUrl) {
+  throw new Error('[STARTUP ERROR] SUPABASE_URL is not set. Please check your .env file.');
+}
+if (!supabaseKey) {
+  throw new Error('[STARTUP ERROR] SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_ANON_KEY) is not set. Please check your .env file.');
+}
 
 // Initialize and export the Supabase Client
 export const supabase = createClient(supabaseUrl, supabaseKey);

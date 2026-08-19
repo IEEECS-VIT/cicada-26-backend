@@ -1,36 +1,28 @@
 import { Request, Response, NextFunction } from 'express';
 import db, { supabase } from '../db.js';
 
-export interface SessionData {
+// ---------------------------------------------------------------------------
+// Session Store
+// Stores: token -> { email, expiresAt }
+// ---------------------------------------------------------------------------
+interface SessionEntry {
   email: string;
-  lastActive: number;
+  expiresAt: number; // Unix ms timestamp
 }
 
-// Simple in-memory session store
-export const activeSessions = new Map<string, SessionData>(); // token -> SessionData
+export const activeSessions = new Map<string, SessionEntry>();
 
-export const checkCookieSession = async (
-  req: Request,
-  res: Response
-): Promise<{ valid: boolean; email?: string; expired?: boolean }> => {
-  const sessionToken = getCookie(req, 'session_token');
-  if (!sessionToken) {
-    return { valid: false };
-  }
-  const session = activeSessions.get(sessionToken);
-  if (!session) {
-    return { valid: false };
-  }
+const SESSION_TTL_MS = (parseInt(process.env.SESSION_TTL_MINUTES || '30', 10)) * 60 * 1000;
+
+// Clean up expired sessions periodically (every 5 minutes)
+setInterval(() => {
   const now = Date.now();
-  const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutes in milliseconds
-  if (now - session.lastActive > INACTIVITY_LIMIT) {
-    activeSessions.delete(sessionToken);
-    res.clearCookie('session_token');
-    return { valid: false, expired: true };
+  for (const [token, entry] of activeSessions.entries()) {
+    if (now > entry.expiresAt) {
+      activeSessions.delete(token);
+    }
   }
-  session.lastActive = now;
-  return { valid: true, email: session.email };
-};
+}, 5 * 60 * 1000);
 
 export const getCookie = (req: Request, name: string): string | undefined => {
   const cookieHeader = req.headers.cookie;
@@ -43,39 +35,58 @@ export const getCookie = (req: Request, name: string): string | undefined => {
   return undefined;
 };
 
+// ---------------------------------------------------------------------------
+// Validate that all required env vars are present at startup
+// ---------------------------------------------------------------------------
+export const validateEnv = (): void => {
+  const required = ['GOD_API_KEY', 'ADMIN_API_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'];
+  const missing = required.filter((k) => !process.env[k]);
+  if (missing.length > 0) {
+    throw new Error(
+      `[STARTUP ERROR] Missing required environment variables: ${missing.join(', ')}. ` +
+      `Please check your .env file.`
+    );
+  }
+};
+
+// ---------------------------------------------------------------------------
+// requireAuth
+// Accepts ONLY:
+//   1. GOD/Admin API key headers (x-god-key / x-admin-key)
+//   2. Supabase JWT via Authorization: Bearer <token>
+//   3. Server-issued session_token cookie (with TTL)
+//
+// REMOVED insecure bypasses: x-user-email, x-user-id, body email/id
+// ---------------------------------------------------------------------------
 export const requireAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const godKey = req.headers['x-god-key'] || req.query.god_key || req.body?.x_god_key;
-    const adminKey = req.headers['x-admin-key'] || req.query.admin_key || req.body?.x_admin_key;
-    const expectedGodKey = process.env.GOD_API_KEY || 'god_secret_CICADA_SUPER_ADMIN_2067';
-    const expectedAdminKey = process.env.ADMIN_API_KEY || 'sb_secret_PDPDEMJYJko0s5Bg7fP_GQ_hO5TgW09';
+    const godKey = req.headers['x-god-key'] as string | undefined;
+    const adminKey = req.headers['x-admin-key'] as string | undefined;
+    const expectedGodKey = process.env.GOD_API_KEY!;
+    const expectedAdminKey = process.env.ADMIN_API_KEY!;
 
-    // 1. Allow Master API Keys (Admin / GOD bypass)
+    // 1. Allow Master API Keys (Admin / GOD header bypass)
     if ((godKey && godKey === expectedGodKey) || (adminKey && adminKey === expectedAdminKey)) {
       return next();
     }
 
-    // Check Session Token Cookie
+    // 2. Check server-issued session_token cookie
     const sessionToken = getCookie(req, 'session_token');
     if (sessionToken) {
-      const sessionResult = await checkCookieSession(req, res);
-      if (sessionResult.expired) {
-        res.status(401).json({
-          success: false,
-          error: 'Session expired due to inactivity. Please log in again.',
-        });
-        return;
-      }
-      if (sessionResult.valid && sessionResult.email) {
-        const dbUser = await db.users.findByEmail(sessionResult.email);
+      const entry = activeSessions.get(sessionToken);
+      if (entry && Date.now() < entry.expiresAt) {
+        const dbUser = await db.users.findByEmail(entry.email);
         if (dbUser) {
           (req as any).user = dbUser;
           return next();
         }
+      } else if (entry) {
+        // Token exists but expired — clean it up
+        activeSessions.delete(sessionToken);
       }
     }
 
-    // 2. Check Bearer Token (Active Supabase Session)
+    // 3. Check Bearer Token (Supabase JWT) — PRIMARY auth method
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
@@ -88,71 +99,49 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
         }
       }
     }
-
-    // 3. Check Active Session User Email Header / Body / Query
-    const userEmail = (req.headers['x-user-email'] || req.body?.user_email || req.body?.email || req.query?.user_email || req.query?.email) as string;
-    if (userEmail && typeof userEmail === 'string' && userEmail.trim()) {
-      const dbUser = await db.users.findByEmail(userEmail.trim().toLowerCase());
-      if (dbUser) {
-        (req as any).user = dbUser;
-        return next();
-      }
-    }
-
-    // 4. Check Active Session User ID Header / Body / Query
-    const userId = (req.headers['x-user-id'] || req.body?.user_id || req.query?.user_id) as string;
-    if (userId && typeof userId === 'string' && userId.trim()) {
-      const dbUser = await db.users.findById(userId.trim());
-      if (dbUser) {
-        (req as any).user = dbUser;
-        return next();
-      }
-    }
   } catch (e) {
     // Fall through to unauthorized
   }
 
   res.status(401).json({
     success: false,
-    error: 'Unauthorized: Authentication required. Please log in to access this route.',
+    error: 'Unauthorized: A valid Supabase access token (Bearer) or active session is required.',
   });
 };
 
 export const requireUserAuth = requireAuth;
 
+// ---------------------------------------------------------------------------
+// requireAdmin
+// ---------------------------------------------------------------------------
 export const requireAdmin = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const godKey = req.headers['x-god-key'] || req.query.god_key || req.body?.x_god_key;
-    const adminKey = req.headers['x-admin-key'] || req.query.admin_key || req.body?.x_admin_key;
-    const expectedGodKey = process.env.GOD_API_KEY || 'god_secret_CICADA_SUPER_ADMIN_2067';
-    const expectedAdminKey = process.env.ADMIN_API_KEY || 'sb_secret_PDPDEMJYJko0s5Bg7fP_GQ_hO5TgW09';
+    const godKey = req.headers['x-god-key'] as string | undefined;
+    const adminKey = req.headers['x-admin-key'] as string | undefined;
+    const expectedGodKey = process.env.GOD_API_KEY!;
+    const expectedAdminKey = process.env.ADMIN_API_KEY!;
 
-    // 1. Check Master Keys (GOD or Admin)
+    // 1. Check Master API Keys (GOD or Admin header)
     if ((godKey && godKey === expectedGodKey) || (adminKey && adminKey === expectedAdminKey)) {
       return next();
     }
 
-    // Check Session Token Cookie
+    // 2. Check server-issued session_token cookie
     const sessionToken = getCookie(req, 'session_token');
     if (sessionToken) {
-      const sessionResult = await checkCookieSession(req, res);
-      if (sessionResult.expired) {
-        res.status(401).json({
-          success: false,
-          error: 'Session expired due to inactivity. Please log in again.',
-        });
-        return;
-      }
-      if (sessionResult.valid && sessionResult.email) {
-        const dbUser = await db.users.findByEmail(sessionResult.email);
+      const entry = activeSessions.get(sessionToken);
+      if (entry && Date.now() < entry.expiresAt) {
+        const dbUser = await db.users.findByEmail(entry.email);
         if (dbUser && (dbUser.role === 'admin' || dbUser.role === 'GOD') && dbUser.is_admin_approved !== false) {
           (req as any).user = dbUser;
           return next();
         }
+      } else if (entry) {
+        activeSessions.delete(sessionToken);
       }
     }
 
-    // 2. Check Bearer Token (Active Supabase Session)
+    // 3. Check Bearer Token (Supabase JWT)
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
@@ -160,26 +149,9 @@ export const requireAdmin = async (req: Request, res: Response, next: NextFuncti
       if (authUser?.email) {
         const dbUser = await db.users.findByEmail(authUser.email);
         if (dbUser && (dbUser.role === 'admin' || dbUser.role === 'GOD') && dbUser.is_admin_approved !== false) {
+          (req as any).user = dbUser;
           return next();
         }
-      }
-    }
-
-    // 3. Check Active Session User Email Header (x-user-email)
-    const userEmail = (req.headers['x-user-email'] || req.body?.admin_email) as string;
-    if (userEmail) {
-      const dbUser = await db.users.findByEmail(userEmail);
-      if (dbUser && (dbUser.role === 'admin' || dbUser.role === 'GOD') && dbUser.is_admin_approved !== false) {
-        return next();
-      }
-    }
-
-    // 4. Check Active Session User ID Header (x-user-id / admin_user_id)
-    const userId = (req.headers['x-user-id'] || req.body?.admin_user_id || req.query?.admin_user_id) as string;
-    if (userId) {
-      const dbUser = await db.users.findById(userId);
-      if (dbUser && (dbUser.role === 'admin' || dbUser.role === 'GOD') && dbUser.is_admin_approved !== false) {
-        return next();
       }
     }
   } catch (e) {
@@ -188,41 +160,39 @@ export const requireAdmin = async (req: Request, res: Response, next: NextFuncti
 
   res.status(401).json({
     success: false,
-    error: 'Unauthorized: Active Admin/GOD session, valid API key, or privileges required',
+    error: 'Unauthorized: Active Admin/GOD session, valid API key, or privileges required.',
   });
 };
 
+// ---------------------------------------------------------------------------
+// requireGod
+// ---------------------------------------------------------------------------
 export const requireGod = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const godKey = req.headers['x-god-key'] || req.query.god_key || req.body?.x_god_key;
-    const expectedGodKey = process.env.GOD_API_KEY || 'god_secret_CICADA_SUPER_ADMIN_2067';
+    const godKey = req.headers['x-god-key'] as string | undefined;
+    const expectedGodKey = process.env.GOD_API_KEY!;
 
-    // 1. Check Master GOD Key
+    // 1. Check Master GOD Key header
     if (godKey && godKey === expectedGodKey) {
       return next();
     }
 
-    // Check Session Token Cookie
+    // 2. Check server-issued session_token cookie
     const sessionToken = getCookie(req, 'session_token');
     if (sessionToken) {
-      const sessionResult = await checkCookieSession(req, res);
-      if (sessionResult.expired) {
-        res.status(401).json({
-          success: false,
-          error: 'Session expired due to inactivity. Please log in again.',
-        });
-        return;
-      }
-      if (sessionResult.valid && sessionResult.email) {
-        const dbUser = await db.users.findByEmail(sessionResult.email);
+      const entry = activeSessions.get(sessionToken);
+      if (entry && Date.now() < entry.expiresAt) {
+        const dbUser = await db.users.findByEmail(entry.email);
         if (dbUser && dbUser.role === 'GOD') {
           (req as any).user = dbUser;
           return next();
         }
+      } else if (entry) {
+        activeSessions.delete(sessionToken);
       }
     }
 
-    // 2. Check Bearer Token (Active Supabase Session for GOD role)
+    // 3. Check Bearer Token (Supabase JWT)
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
@@ -230,26 +200,9 @@ export const requireGod = async (req: Request, res: Response, next: NextFunction
       if (authUser?.email) {
         const dbUser = await db.users.findByEmail(authUser.email);
         if (dbUser && dbUser.role === 'GOD') {
+          (req as any).user = dbUser;
           return next();
         }
-      }
-    }
-
-    // 3. Check Active Session User Email Header (x-user-email)
-    const userEmail = (req.headers['x-user-email'] || req.body?.god_email || req.body?.admin_email) as string;
-    if (userEmail) {
-      const dbUser = await db.users.findByEmail(userEmail);
-      if (dbUser && dbUser.role === 'GOD') {
-        return next();
-      }
-    }
-
-    // 4. Check Active Session User ID Header
-    const userId = (req.headers['x-user-id'] || req.body?.god_user_id || req.query?.god_user_id) as string;
-    if (userId) {
-      const dbUser = await db.users.findById(userId);
-      if (dbUser && dbUser.role === 'GOD') {
-        return next();
       }
     }
   } catch (e) {
@@ -258,6 +211,6 @@ export const requireGod = async (req: Request, res: Response, next: NextFunction
 
   res.status(403).json({
     success: false,
-    error: 'Forbidden: GOD (Super Admin) privileges or valid x-god-key required',
+    error: 'Forbidden: GOD (Super Admin) privileges or valid x-god-key required.',
   });
 };
