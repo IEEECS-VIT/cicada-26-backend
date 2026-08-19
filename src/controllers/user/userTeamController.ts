@@ -22,6 +22,13 @@ export class UserTeamController {
         return;
       }
 
+      // Security Check: Block SQL injection & weird characters in team name
+      const teamNameRegex = /^[a-zA-Z0-9 _-]+$/;
+      if (!teamNameRegex.test(team_name.trim())) {
+        res.status(400).json({ success: false, error: 'team_name can only contain alphanumeric characters, spaces, underscores, and dashes.' });
+        return;
+      }
+
       if (user.team_id) {
         res.status(400).json({ success: false, error: 'You are already in a team. You cannot create another one.' });
         return;
@@ -105,6 +112,13 @@ export class UserTeamController {
 
       if (!new_team_name || !new_team_name.trim()) {
         res.status(400).json({ success: false, error: 'new_team_name is required.' });
+        return;
+      }
+
+      // Security Check: Block SQL injection & weird characters in team name
+      const teamNameRegex = /^[a-zA-Z0-9 _-]+$/;
+      if (!teamNameRegex.test(new_team_name.trim())) {
+        res.status(400).json({ success: false, error: 'new_team_name can only contain alphanumeric characters, spaces, underscores, and dashes.' });
         return;
       }
 

@@ -127,7 +127,7 @@ export const requireAdmin = async (req: Request, res: Response, next: NextFuncti
       const entry = activeSessions.get(sessionToken);
       if (entry && Date.now() < entry.expiresAt) {
         const dbUser = await db.users.findByEmail(entry.email);
-        if (dbUser && (dbUser.role === 'admin' || dbUser.role === 'GOD') && dbUser.is_admin_approved !== false) {
+        if (dbUser && (dbUser.role === 'admin' || dbUser.role === 'GOD')) {
           (req as any).user = dbUser;
           return next();
         }
@@ -143,7 +143,7 @@ export const requireAdmin = async (req: Request, res: Response, next: NextFuncti
       const { data: { user: authUser } } = await supabase.auth.getUser(token);
       if (authUser?.email) {
         const dbUser = await db.users.findByEmail(authUser.email);
-        if (dbUser && (dbUser.role === 'admin' || dbUser.role === 'GOD') && dbUser.is_admin_approved !== false) {
+        if (dbUser && (dbUser.role === 'admin' || dbUser.role === 'GOD')) {
           (req as any).user = dbUser;
           return next();
         }
