@@ -409,6 +409,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
       last_attempt_at: item.last_attempt_at || item.updated_at || item.created_at,
     })) as TeamProgress[];
   }
+
   /**
    * Admin: Reset a team's progress back to challenge 1
    */

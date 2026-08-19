@@ -76,7 +76,7 @@ export class UserAuthController {
       const adminSecretKey = isApprovedAdmin ? (process.env.ADMIN_API_KEY || 'sb_secret_PDPDEMJYJko0s5Bg7fP_GQ_hO5TgW09') : null;
 
       const sessionToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
-      activeSessions.set(sessionToken, email);
+      activeSessions.set(sessionToken, { email, lastActive: Date.now() });
       res.cookie('session_token', sessionToken, { httpOnly: true, secure: false, path: '/' });
 
       res.json({

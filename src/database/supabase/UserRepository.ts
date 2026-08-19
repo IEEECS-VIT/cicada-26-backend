@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { IUserRepository, User } from '../interfaces';
+import { IUserRepository, User } from '../../repositories/interfaces.js';
 
 export class SupabaseUserRepository implements IUserRepository {
   private supabase: SupabaseClient;

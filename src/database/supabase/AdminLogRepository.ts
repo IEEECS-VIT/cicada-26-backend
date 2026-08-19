@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { IAdminLogRepository, AdminLog } from '../interfaces';
+import { IAdminLogRepository, AdminLog } from '../../repositories/interfaces.js';
 
 export class SupabaseAdminLogRepository implements IAdminLogRepository {
   private supabase: SupabaseClient;
