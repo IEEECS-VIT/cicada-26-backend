@@ -8,8 +8,8 @@ const MAX_ATTEMPTS = 5; // 5 attempts per minute
 
 export const submissionRateLimiter = (req: Request, res: Response, next: NextFunction): void => {
   const ipKey = req.ip || 'unknown-ip';
-  const teamName = req.body?.team_name;
-  const teamKey = teamName ? String(teamName).trim().toLowerCase() : null;
+  const user = (req as any).user;
+  const teamKey = user?.team_id ? String(user.team_id) : null;
 
   const now = Date.now();
 
