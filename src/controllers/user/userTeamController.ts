@@ -34,8 +34,8 @@ export class UserTeamController {
         return;
       }
 
-      const { v4: uuidv4 } = await import('uuid');
-      const team_id = uuidv4();
+      const uuidv4 = crypto.randomUUID();
+      const team_id = uuidv4;
       const invite_code = generateInviteCode();
 
       await db.teams.createTeamAndJoin(user.id, team_name.trim(), invite_code, team_id);
@@ -188,11 +188,11 @@ export class UserTeamController {
   }
 }
 
-const generateInviteCode = () => {
+function generateInviteCode() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
   for (let i = 0; i < 6; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
-};
+}
