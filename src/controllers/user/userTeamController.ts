@@ -22,13 +22,20 @@ export class UserTeamController {
         return;
       }
 
+      // Security Check: Block SQL injection & weird characters in team name
+      const teamNameRegex = /^[a-zA-Z0-9 _-]+$/;
+      if (!teamNameRegex.test(team_name.trim())) {
+        res.status(400).json({ success: false, error: 'team_name can only contain alphanumeric characters, spaces, underscores, and dashes.' });
+        return;
+      }
+
       if (user.team_id) {
         res.status(400).json({ success: false, error: 'You are already in a team. You cannot create another one.' });
         return;
       }
 
-      const { v4: uuidv4 } = await import('uuid');
-      const team_id = uuidv4();
+      const uuidv4 = crypto.randomUUID();
+      const team_id = uuidv4;
       const invite_code = generateInviteCode();
 
       await db.teams.createTeamAndJoin(user.id, team_name.trim(), invite_code, team_id);
@@ -108,6 +115,13 @@ export class UserTeamController {
         return;
       }
 
+      // Security Check: Block SQL injection & weird characters in team name
+      const teamNameRegex = /^[a-zA-Z0-9 _-]+$/;
+      if (!teamNameRegex.test(new_team_name.trim())) {
+        res.status(400).json({ success: false, error: 'new_team_name can only contain alphanumeric characters, spaces, underscores, and dashes.' });
+        return;
+      }
+
       if (!user.team_id) {
         res.status(400).json({ success: false, error: 'You are not currently in a team.' });
         return;
@@ -174,11 +188,11 @@ export class UserTeamController {
   }
 }
 
-const generateInviteCode = () => {
+function generateInviteCode() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
   for (let i = 0; i < 6; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
-};
+}

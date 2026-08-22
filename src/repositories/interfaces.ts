@@ -4,7 +4,6 @@ export interface User {
   display_name: string | null;
   register_no: string | null;
   role: 'participant' | 'admin' | 'GOD';
-  is_admin_approved?: boolean;
   team_id: string | null;
   joined_team_at: Date | null;
   created_at: Date;
@@ -64,7 +63,7 @@ export interface AdminLog {
 export interface IUserRepository {
   findById(id: string): Promise<User | null>;
   findByEmail(email: string): Promise<User | null>;
-  seedUser(id: string, email: string, display_name: string | null, register_no: string | null, role: 'participant' | 'admin' | 'GOD', is_admin_approved?: boolean): Promise<void>;
+  seedUser(id: string, email: string, display_name: string | null, register_no: string | null, role: 'participant' | 'admin' | 'GOD'): Promise<void>;
   updateDisplayName(id: string, displayName: string): Promise<void>;
   updateTeam(id: string, teamId: string | null): Promise<void>;
   updateRole(id: string, role: 'participant' | 'admin' | 'GOD'): Promise<void>;

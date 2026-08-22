@@ -72,7 +72,7 @@ async function seedAdminsFromCSV() {
         console.log(`✅ UPDATED: '${email}' promoted to Admin.`);
       } else {
         const newId = uuidv4();
-        await db.users.seedUser(newId, email, displayName, registerNo, 'admin', true);
+        await db.users.seedUser(newId, email, displayName, registerNo, 'admin');
         createdCount++;
         console.log(`✨ CREATED: '${email}' provisioned as Super Admin.`);
       }

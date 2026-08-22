@@ -230,21 +230,52 @@ export class ChallengeService {
       throw new Error(`Challenge '${challenge_identifier}' not found`);
     }
 
+    if (!challenge.is_active) {
+      return {
+        success: false,
+        message: 'This challenge is currently inactive and cannot be attempted.',
+        tryAgain: false,
+      };
+    }
+
+    // Bug Fix: If they already solved this challenge, don't update Leaderboard time (which ruins their tie-breaker rank)
+    const alreadyCompleted = existingProgress?.completed_challenges?.includes(challenge.order_number) || false;
+    if (alreadyCompleted) {
+      return {
+        success: true,
+        message: 'You have already completed this challenge.',
+        unlocked_next_challenge: currentUnlockedOrder,
+        story_fragment: challenge.story_fragment || null,
+      };
+    }
+
     if (existingProgress && isStartedAtPlaceholder(existingProgress.challenge_started_at)) {
       const nowStr = new Date().toISOString();
       existingProgress = await this.challengeRepo.updateChallengeStartedAt(team_name.trim(), nowStr, clientIp);
     }
 
     // Verify time limit/timeout
-    if (existingProgress && existingProgress.challenge_started_at) {
+    if (existingProgress && existingProgress.challenge_started_at && !isStartedAtPlaceholder(existingProgress.challenge_started_at)) {
       const startedAt = new Date(existingProgress.challenge_started_at).getTime();
       const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
       const limit = challenge.time_limit !== undefined ? challenge.time_limit : 1800;
       if (elapsedSeconds > limit) {
+        // TIME LIMIT EXCEEDED: Auto-skip to next challenge without awarding points
+        // This prevents the team from being permanently soft-locked forever.
+        const nextChallengeOrder = challenge.order_number + 1;
+        const currentOrder = Math.max(currentUnlockedOrder, nextChallengeOrder);
+        
+        await this.challengeRepo.upsertTeamProgress(
+          team_name.trim(),
+          currentOrder,
+          existingProgress?.completed_challenges || []
+        );
+
         return {
           success: false,
-          message: 'Time Limit Exceeded for this challenge.',
+          message: 'Time Limit Exceeded. You have been moved to the next challenge without points.',
           tryAgain: false,
+          unlocked_next_challenge: currentOrder,
         };
       }
     }

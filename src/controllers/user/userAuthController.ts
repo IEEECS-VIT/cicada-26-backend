@@ -23,7 +23,7 @@ export class UserAuthController {
       // Hardcode role to participant ONLY. Admin registration via public API is forbidden.
       const finalRole: 'participant' = 'participant';
       const id = uuidv4();
-      await db.users.seedUser(id, email.trim(), display_name || null, register_no || null, finalRole, true);
+      await db.users.seedUser(id, email.trim(), display_name || null, register_no || null, finalRole);
 
       res.json({
         success: true,
@@ -76,7 +76,6 @@ export class UserAuthController {
 
       const isGod = user.role === 'GOD';
       const isAdmin = user.role === 'admin' || isGod;
-      const isApprovedAdmin = isAdmin && user.is_admin_approved !== false;
 
       // Issue a server-side session token with TTL
       const sessionToken = uuidv4();
@@ -108,10 +107,10 @@ export class UserAuthController {
         // NOTE: admin_secret_key is the ADMIN_API_KEY from .env.
         // Only sent to approved admins so the frontend can set x-admin-key header.
         // Do NOT log or expose this value publicly.
-        admin_secret_key: isApprovedAdmin ? process.env.ADMIN_API_KEY : null,
-        is_approved_admin: isApprovedAdmin,
+        admin_secret_key: isAdmin ? process.env.ADMIN_API_KEY : null,
+        is_approved_admin: isAdmin,
         session_expires_in_minutes: parseInt(process.env.SESSION_TTL_MINUTES || '30', 10),
-        redirectUrl: isGod ? '/god-portal' : isApprovedAdmin ? '/admin-portal' : '/dashboard',
+        redirectUrl: isGod ? '/god-portal' : isAdmin ? '/admin-portal' : '/dashboard',
       });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });

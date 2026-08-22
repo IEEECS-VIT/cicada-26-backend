@@ -216,8 +216,7 @@ export class AdminAuthController {
               rec.email,
               rec.display_name || null,
               rec.register_no || null,
-              'admin',
-              true
+              'admin'
             );
             createdCount++;
             details.push({ email: rec.email, status: 'created' });

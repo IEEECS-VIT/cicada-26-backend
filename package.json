@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "npx tsx src/index.ts",
+    "start": "npx tsx src/server.ts",
     "build": "echo \"Ready for production\"",
     "dev": "npx tsx watch src/index.ts",
     "seed:admins": "npx tsx src/scripts/seed_admins_csv.ts",

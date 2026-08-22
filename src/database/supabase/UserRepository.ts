@@ -30,7 +30,7 @@ export class SupabaseUserRepository implements IUserRepository {
     return data as User;
   }
 
-  async seedUser(id: string, email: string, display_name: string | null, register_no: string | null, role: 'participant' | 'admin' | 'GOD', is_admin_approved: boolean = true): Promise<void> {
+  async seedUser(id: string, email: string, display_name: string | null, register_no: string | null, role: 'participant' | 'admin' | 'GOD'): Promise<void> {
     const payload: any = { id, email, display_name, register_no, role };
     const { error } = await this.supabase
       .from('users')
