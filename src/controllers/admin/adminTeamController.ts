@@ -77,10 +77,14 @@ export class AdminTeamController {
    * ADMIN ONLY: Adjust a team's score directly
    */
   static async adjustScore(req: Request, res: Response): Promise<void> {
-    const team_id = req.params.id;
+    const team_id_or_name = req.params.id;
     const { delta, exact } = req.body;
     try {
-      const team = await db.teams.findById(team_id);
+      let team = await db.teams.findById(team_id_or_name);
+      if (!team) {
+        team = await db.teams.findByName(team_id_or_name);
+      }
+      
       if (!team) {
         res.status(404).json({ success: false, error: 'Team not found' });
         return;
