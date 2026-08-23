@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import db from '../../db.js';
+import { db, supabase } from '../../db.js';
 import { logAdminActivity } from '../../services/auditLogger.js';
 
 export class AdminTeamController {
@@ -36,7 +36,7 @@ export class AdminTeamController {
    */
   static async getAllTeams(req: Request, res: Response): Promise<void> {
     try {
-      const { data, error } = await db.supabase
+      const { data, error } = await supabase
         .from('teams')
         .select(`
           id, name, invite_code, leader_id, created_at,
@@ -97,7 +97,7 @@ export class AdminTeamController {
         newScore += Number(delta);
       }
       
-      const { error } = await db.supabase
+      const { error } = await supabase
         .from('teams')
         .update({ points: newScore })
         .eq('id', team_id);

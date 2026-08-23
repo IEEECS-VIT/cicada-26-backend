@@ -5,6 +5,9 @@ export class SupabaseTeamRepository implements ITeamRepository {
   private supabase: SupabaseClient;
 
   constructor(client: SupabaseClient) {
+    if (!client) {
+      console.error("FATAL: SupabaseClient passed to SupabaseTeamRepository is undefined!");
+    }
     this.supabase = client;
   }
 
