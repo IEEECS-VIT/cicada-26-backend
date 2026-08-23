@@ -137,9 +137,13 @@ export class UserAuthController {
       }
 
       let teamName: string | null = null;
+      let inviteCode: string | null = null;
       if (user.team_id) {
         const team = await db.teams.findById(user.team_id);
-        teamName = team ? team.name : null;
+        if (team) {
+          teamName = team.name;
+          inviteCode = team.invite_code;
+        }
       }
 
       res.json({
@@ -151,10 +155,13 @@ export class UserAuthController {
           register_no: user.register_no,
           role: user.role,
           team_id: user.team_id,
+          team_name: teamName,
+          invite_code: inviteCode,
           created_at: user.created_at,
           joined_team_at: user.joined_team_at,
         },
         team_name: teamName,
+        invite_code: inviteCode
       });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });

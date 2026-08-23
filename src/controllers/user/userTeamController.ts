@@ -47,6 +47,7 @@ export class UserTeamController {
         invite_code,
       });
     } catch (err: any) {
+      console.error("CREATE TEAM ERROR:", err);
       res.status(400).json({ success: false, error: err.message });
     }
   }

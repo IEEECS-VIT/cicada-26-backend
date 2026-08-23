@@ -31,6 +31,27 @@ export class AdminTeamController {
   }
 
   /**
+   * GET /api/admin/teams/all
+   * ADMIN ONLY: Get all teams and their members
+   */
+  static async getAllTeams(req: Request, res: Response): Promise<void> {
+    try {
+      const { data, error } = await db.supabase
+        .from('teams')
+        .select(`
+          id, name, invite_code, leader_id, created_at,
+          users:users(id, email, display_name, register_no)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw new Error(error.message);
+      res.json({ success: true, data });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
    * POST /api/admin/teams/delete-team
    * ADMIN ONLY: Delete team
    */
@@ -46,6 +67,41 @@ export class AdminTeamController {
       await logAdminActivity(req, 'DELETE_TEAM', { team_id });
 
       res.json({ success: true, message: 'Team forcefully deleted by admin.' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * PATCH /api/admin/teams/:id/score
+   * ADMIN ONLY: Adjust a team's score directly
+   */
+  static async adjustScore(req: Request, res: Response): Promise<void> {
+    const team_id = req.params.id;
+    const { delta, exact } = req.body;
+    try {
+      const team = await db.teams.findById(team_id);
+      if (!team) {
+        res.status(404).json({ success: false, error: 'Team not found' });
+        return;
+      }
+      
+      let newScore = team.points || 0;
+      if (exact !== undefined) {
+        newScore = Number(exact);
+      } else if (delta !== undefined) {
+        newScore += Number(delta);
+      }
+      
+      const { error } = await db.supabase
+        .from('teams')
+        .update({ points: newScore })
+        .eq('id', team_id);
+        
+      if (error) throw error;
+      
+      await logAdminActivity(req, 'ADJUST_SCORE', { team_id, delta, exact, newScore });
+      res.json({ success: true, message: 'Score updated', newScore });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
