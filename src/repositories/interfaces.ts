@@ -75,6 +75,7 @@ export interface IUserRepository {
 
 export interface ITeamRepository {
   findById(id: string): Promise<Team | null>;
+  findByName(name: string): Promise<Team | null>;
   findByInviteCode(inviteCode: string): Promise<Team | null>;
   countMembers(teamId: string): Promise<number>;
   createTeamAndJoin(userId: string, teamName: string, inviteCode: string, teamId: string): Promise<void>;

@@ -18,6 +18,16 @@ export class SupabaseTeamRepository implements ITeamRepository {
     return data as Team;
   }
 
+  async findByName(name: string): Promise<Team | null> {
+    const { data, error } = await this.supabase
+      .from('teams')
+      .select('*')
+      .eq('name', name)
+      .single();
+    if (error || !data) return null;
+    return data as Team;
+  }
+
   async findByInviteCode(inviteCode: string): Promise<Team | null> {
     const { data, error } = await this.supabase
       .from('teams')
