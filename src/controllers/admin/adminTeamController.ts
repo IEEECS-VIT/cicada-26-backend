@@ -100,11 +100,11 @@ export class AdminTeamController {
       const { error } = await supabase
         .from('teams')
         .update({ points: newScore })
-        .eq('id', team_id);
+        .eq('id', team.id);
         
       if (error) throw error;
       
-      await logAdminActivity(req, 'ADJUST_SCORE', { team_id, delta, exact, newScore });
+      await logAdminActivity(req, 'ADJUST_SCORE', { team_id: team.id, delta, exact, newScore });
       res.json({ success: true, message: 'Score updated', newScore });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
