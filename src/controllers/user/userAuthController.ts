@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import db, { supabaseAnon } from '../../db.js';
-import { activeSessions } from '../../middleware/authMiddleware.js';
+import { activeSessions, getCookie } from '../../middleware/authMiddleware.js';
 
 const SESSION_TTL_MS = (parseInt(process.env.SESSION_TTL_MINUTES || '30', 10)) * 60 * 1000;
 
@@ -167,7 +167,7 @@ export class UserAuthController {
    */
   static async logout(req: Request, res: Response): Promise<void> {
     try {
-      const sessionToken = req.cookies?.session_token;
+      const sessionToken = getCookie(req, 'session_token');
       if (sessionToken) {
         activeSessions.delete(sessionToken);
       }
