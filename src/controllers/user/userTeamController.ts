@@ -187,6 +187,33 @@ export class UserTeamController {
       res.status(500).json({ success: false, error: err.message });
     }
   }
+
+  /**
+   * GET /api/teams/me/members
+   * Fetch all members of the user's current team
+   */
+  static async getMyTeamMembers(req: Request, res: Response): Promise<void> {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        res.status(401).json({ success: false, error: 'Unauthorized: Authentication required.' });
+        return;
+      }
+
+      if (!user.team_id) {
+        res.status(400).json({ success: false, error: 'You are not currently in any team.' });
+        return;
+      }
+
+      const members = await db.users.findByTeamId(user.team_id);
+      res.json({
+        success: true,
+        data: members
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
 }
 
 function generateInviteCode() {

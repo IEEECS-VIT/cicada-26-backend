@@ -70,6 +70,7 @@ export interface IUserRepository {
   approveAdmin(id: string): Promise<void>;
   countUsers(): Promise<number>;
   listAllUsers(): Promise<User[]>;
+  findByTeamId(teamId: string): Promise<User[]>;
   deleteUser(id: string): Promise<void>;
 }
 
