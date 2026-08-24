@@ -14,6 +14,55 @@ const getClientIp = (req: Request): string => {
   return req.ip || req.socket?.remoteAddress || '127.0.0.1';
 };
 
+// SSRF protection for proxying challenge assets.
+const MAX_ASSET_BYTES = 20 * 1024 * 1024; // 20MB
+const ASSET_FETCH_TIMEOUT_MS = 15000;
+
+const getAllowedAssetHosts = (): Set<string> => {
+  const hosts = new Set<string>();
+  const supabaseUrl = process.env.SUPABASE_URL;
+  if (supabaseUrl) {
+    try {
+      hosts.add(new URL(supabaseUrl).hostname);
+    } catch {
+      // ignore malformed SUPABASE_URL
+    }
+  }
+  const extra = process.env.ASSET_ALLOWED_HOSTS;
+  if (extra) {
+    for (const h of extra.split(',')) {
+      const host = h.trim();
+      if (host) hosts.add(host);
+    }
+  }
+  return hosts;
+};
+
+const validateAssetUrl = (rawUrl: string): URL => {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    throw new Error('Invalid asset URL');
+  }
+
+  const isDev = process.env.NODE_ENV !== 'production';
+  const isLocalHttp = url.protocol === 'http:'
+    && isDev
+    && (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1');
+
+  if (url.protocol !== 'https:' && !isLocalHttp) {
+    throw new Error('Asset URL must use HTTPS');
+  }
+
+  const allowedHosts = getAllowedAssetHosts();
+  if (allowedHosts.size > 0 && !allowedHosts.has(url.hostname)) {
+    throw new Error('Asset URL host is not allowed');
+  }
+
+  return url;
+};
+
 // CHANGE 3+4: Answer submission now uses team_id from authenticated user — NOT body team_name
 const submitAnswerSchema = z.object({
   challenge_identifier: z.union([z.string(), z.number()]),
@@ -304,16 +353,57 @@ export class UserChallengeController {
         return;
       }
 
-      const response = await fetch(asset.url);
-      if (!response.ok) {
+      let assetUrl: URL;
+      try {
+        assetUrl = validateAssetUrl(asset.url);
+      } catch (err: any) {
+        res.status(400).json({ success: false, error: err.message || 'Invalid asset URL' });
+        return;
+      }
+
+      let assetResponse: globalThis.Response;
+      try {
+        assetResponse = await fetch(assetUrl.toString(), {
+          redirect: 'manual',
+          signal: AbortSignal.timeout(ASSET_FETCH_TIMEOUT_MS),
+        });
+      } catch (err: any) {
+        if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+          res.status(504).json({ success: false, error: 'Asset fetch timed out' });
+        } else {
+          res.status(502).json({ success: false, error: 'Failed to retrieve asset from origin storage' });
+        }
+        return;
+      }
+
+      if (assetResponse.status >= 300 && assetResponse.status < 400) {
+        res.status(502).json({ success: false, error: 'Asset redirects are not allowed' });
+        return;
+      }
+
+      if (!assetResponse.ok) {
         res.status(404).json({ success: false, error: 'Failed to retrieve asset from origin storage' });
         return;
       }
 
-      const contentType = response.headers.get('content-type') || 'application/octet-stream';
+      const contentLength = assetResponse.headers.get('content-length');
+      if (contentLength) {
+        const size = parseInt(contentLength, 10);
+        if (!isNaN(size) && size > MAX_ASSET_BYTES) {
+          res.status(413).json({ success: false, error: 'Asset is too large' });
+          return;
+        }
+      }
+
+      const arrayBuffer = await assetResponse.arrayBuffer();
+      if (arrayBuffer.byteLength > MAX_ASSET_BYTES) {
+        res.status(413).json({ success: false, error: 'Asset is too large' });
+        return;
+      }
+
+      const contentType = assetResponse.headers.get('content-type') || 'application/octet-stream';
       res.setHeader('Content-Type', contentType);
 
-      const arrayBuffer = await response.arrayBuffer();
       res.send(Buffer.from(arrayBuffer));
     } catch (error: any) {
       if (error.message?.startsWith('IP_MISMATCH:')) {
