@@ -20,14 +20,11 @@ import godLogRoutes from './routes/god/logRoutes.js';
 const app: Express = express();
 
 // ---------------------------------------------------------------------------
-// CORS — only allow requests from the configured frontend origin
-// ---------------------------------------------------------------------------
-const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
+// CORS - allow all origins in development
 app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (server-to-server, curl, Postman)
-    if (!origin) return callback(null, true);
-    if (origin === allowedOrigin) return callback(null, true);
+  origin: process.env.NODE_ENV === 'development' ? true : (origin, callback) => {
+    const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
+    if (!origin || origin === allowedOrigin) return callback(null, true);
     callback(new Error(`CORS: Origin '${origin}' is not allowed.`));
   },
   credentials: true, // Allow cookies (session_token HttpOnly cookie)
