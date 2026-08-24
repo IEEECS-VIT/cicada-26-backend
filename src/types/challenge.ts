@@ -92,6 +92,8 @@ export interface SubmitAnswerDto {
   team_name: string;
   challenge_identifier: string | number; // Order number or UUID
   answer: string;
+  team_id?: string;
+  user_id?: string;
 }
 
 export interface SubmitAnswerResult {

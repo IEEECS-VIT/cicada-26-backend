@@ -1,4 +1,5 @@
 import bcrypt from 'bcrypt';
+import db from '../db.js';
 import { supabaseChallengeRepository, SupabaseChallengeRepository } from '../database/supabase/supabaseChallengeRepository.js';
 import { supabaseLeaderboardRepository, SupabaseLeaderboardRepository } from '../database/supabase/supabaseLeaderboardRepository.js';
 import {
@@ -298,6 +299,15 @@ export class ChallengeService {
     } else {
       isCorrect = normalizedSubmitted === challenge.answer_key.trim().toLowerCase();
     }
+
+    // Log the submission attempt for admin visibility (submission_logs table)
+    await db.submissionLogs.logSubmission(
+      dto.team_id ?? null,
+      dto.user_id ?? null,
+      challenge.id,
+      answer,
+      isCorrect
+    );
 
     if (!isCorrect) {
       return {
