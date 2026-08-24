@@ -15,7 +15,7 @@ dotenv.config();
 // ---------------------------------------------------------------------------
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseServiceRoleKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZkemNybXd3anBmd250YmFraWVkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDE0NTg3MywiZXhwIjoyMDk5NzIxODczfQ.wvpU2sivRL7gDzs2PFqNP6vzmuhH_3F4aHbBL0VcWTU";
 
 if (!supabaseUrl) {
   throw new Error('[STARTUP ERROR] SUPABASE_URL is not set. Please check your .env file.');

@@ -84,10 +84,21 @@ export class SupabaseUserRepository implements IUserRepository {
   async listAllUsers(): Promise<User[]> {
     const { data, error } = await this.supabase
       .from('users')
-      .select('*')
+      .select('*, teams(name)')
       .order('created_at', { ascending: false });
-    if (error || !data) return [];
-    return data as User[];
+
+    if (error) return [];
+    return data as any[];
+  }
+
+  async findByTeamId(teamId: string): Promise<User[]> {
+    const { data, error } = await this.supabase
+      .from('users')
+      .select('id, display_name, email, register_no')
+      .eq('team_id', teamId);
+      
+    if (error) return [];
+    return data as any[];
   }
 
   async deleteUser(id: string): Promise<void> {

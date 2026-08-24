@@ -70,11 +70,13 @@ export interface IUserRepository {
   approveAdmin(id: string): Promise<void>;
   countUsers(): Promise<number>;
   listAllUsers(): Promise<User[]>;
+  findByTeamId(teamId: string): Promise<User[]>;
   deleteUser(id: string): Promise<void>;
 }
 
 export interface ITeamRepository {
   findById(id: string): Promise<Team | null>;
+  findByName(name: string): Promise<Team | null>;
   findByInviteCode(inviteCode: string): Promise<Team | null>;
   countMembers(teamId: string): Promise<number>;
   createTeamAndJoin(userId: string, teamName: string, inviteCode: string, teamId: string): Promise<void>;

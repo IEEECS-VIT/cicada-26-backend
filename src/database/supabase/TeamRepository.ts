@@ -5,6 +5,9 @@ export class SupabaseTeamRepository implements ITeamRepository {
   private supabase: SupabaseClient;
 
   constructor(client: SupabaseClient) {
+    if (!client) {
+      console.error("FATAL: SupabaseClient passed to SupabaseTeamRepository is undefined!");
+    }
     this.supabase = client;
   }
 
@@ -13,6 +16,16 @@ export class SupabaseTeamRepository implements ITeamRepository {
       .from('teams')
       .select('*')
       .eq('id', id)
+      .single();
+    if (error || !data) return null;
+    return data as Team;
+  }
+
+  async findByName(name: string): Promise<Team | null> {
+    const { data, error } = await this.supabase
+      .from('teams')
+      .select('*')
+      .eq('name', name)
       .single();
     if (error || !data) return null;
     return data as Team;
