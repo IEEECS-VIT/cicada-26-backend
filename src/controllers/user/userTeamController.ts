@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { randomUUID } from 'node:crypto';
 import db from '../../db.js';
 
 export class UserTeamController {
@@ -34,8 +35,7 @@ export class UserTeamController {
         return;
       }
 
-      const uuidv4 = crypto.randomUUID();
-      const team_id = uuidv4;
+      const team_id = randomUUID();
       const invite_code = generateInviteCode();
 
       await db.teams.createTeamAndJoin(user.id, team_name.trim(), invite_code, team_id);
