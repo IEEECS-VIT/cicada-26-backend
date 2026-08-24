@@ -30,8 +30,16 @@ export const getCookie = (req: Request, name: string): string | undefined => {
   const cookieHeader = req.headers.cookie;
   if (!cookieHeader) return undefined;
   for (const cookie of cookieHeader.split(';')) {
-    const [key, val] = cookie.trim().split('=');
-    if (key === name) return val;
+    const eqIndex = cookie.indexOf('=');
+    if (eqIndex === -1) continue;
+    const key = cookie.slice(0, eqIndex).trim();
+    if (key !== name) continue;
+    const raw = cookie.slice(eqIndex + 1).trim();
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
   }
   return undefined;
 };

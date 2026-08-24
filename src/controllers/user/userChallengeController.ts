@@ -264,6 +264,8 @@ export class UserChallengeController {
           team_name: team.name, // Resolved server-side from team_id — never from client
           challenge_identifier: validatedData.challenge_identifier,
           answer: validatedData.answer,
+          team_id: team.id,
+          user_id: user.id,
         },
         getClientIp(req)
       );
