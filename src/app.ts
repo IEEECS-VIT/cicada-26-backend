@@ -35,7 +35,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-key', 'x-god-key'],
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 
 // ---------------------------------------------------------------------------
 // Security headers — disable caching on all responses
