@@ -2,11 +2,13 @@ import { Router } from 'express';
 import { UserChallengeController } from '../../controllers/user/userChallengeController.js';
 import { requireAuth } from '../../middleware/authMiddleware.js';
 import { submissionRateLimiter } from '../../middleware/rateLimitMiddleware.js';
+import { ipTrackingMiddleware } from '../../middleware/ipTrackingMiddleware.js';
 
 const router = Router();
 
 // Require user authentication for all challenge operations
 router.use(requireAuth);
+router.use(ipTrackingMiddleware);
 
 router.post('/submit', submissionRateLimiter, UserChallengeController.submitAnswer);
 router.get('/', UserChallengeController.getPublicChallenges);

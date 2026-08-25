@@ -12,5 +12,7 @@ router.get('/users', AdminAuthController.listUsers);
 router.post('/delete-user', AdminAuthController.deleteUser);
 router.post('/bulk-import-admins', AdminAuthController.bulkImportAdmins);
 router.post('/import-admins', AdminAuthController.bulkImportAdmins);
+router.get('/ip-tracking', AdminAuthController.getIpTrackingStatus);
+router.post('/toggle-ip-tracking', AdminAuthController.toggleIpTracking);
 
 export default router;

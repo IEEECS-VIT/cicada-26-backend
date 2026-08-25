@@ -41,7 +41,7 @@ This document provides a formal record of the features and enhancements that hav
 * **IST Timestamp Synchronization**: Configured returned challenge timestamps (`created_at`, `updated_at`, and `challenge_started_at`) to dynamically represent Indian Standard Time (IST, `+05:30` offset). For active challenges, the `created_at` and `updated_at` timestamps are overwritten with the dynamic session start time to prevent client-side countdown clock errors.
 
 ### 1.6. Dynamic IP Protection & URL Masking
-* **Same-IP Location Lock**: Track client IP addresses when challenges are retrieved. Enforce same-IP locks to prevent participants from sharing session data or having experts solve challenges from remote locations. Intercept and block mismatched IPs with a `403 Forbidden` error.
+* **Same-IP Location Lock & Dynamic Toggle**: Track client IP addresses when challenges are retrieved. Enforce same-IP locks to prevent participants from sharing session data or having experts solve challenges from remote locations. Intercept and block mismatched IPs with a `403 Forbidden` error. Provides an admin toggle (`POST /api/admin/challenges/ip-tracking/toggle`) allowing event administrators to turn IP tracking middleware on and off at runtime without server restarts.
 * **Asset URL Masking**: Mask origin storage URLs (e.g. Unsplash, Google Storage) to prevent backtracking. Replaced with proxy endpoint `/api/challenges/assets/masked?c=...&i=...` which validates authorization and streams content securely from the backend.
 
 ### 1.7. Administrative Asset Management

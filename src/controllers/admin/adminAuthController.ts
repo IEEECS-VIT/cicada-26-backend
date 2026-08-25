@@ -244,4 +244,22 @@ export class AdminAuthController {
       res.status(500).json({ success: false, error: err.message });
     }
   }
+
+  /**
+   * GET /api/admin/auth/ip-tracking
+   * Check IP tracking state
+   */
+  static async getIpTrackingStatus(req: Request, res: Response): Promise<void> {
+    const { AdminChallengeController } = await import('./adminChallengeController.js');
+    return AdminChallengeController.getIpTrackingStatus(req, res);
+  }
+
+  /**
+   * POST /api/admin/auth/toggle-ip-tracking
+   * Toggle IP tracking state
+   */
+  static async toggleIpTracking(req: Request, res: Response): Promise<void> {
+    const { AdminChallengeController } = await import('./adminChallengeController.js');
+    return AdminChallengeController.toggleIpTracking(req, res);
+  }
 }
