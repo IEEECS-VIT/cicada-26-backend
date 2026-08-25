@@ -1,0 +1,15 @@
+meta {
+  name: 05_Get_My_Team
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/teams/me
+  body: none
+  auth: none
+}
+
+headers {
+  x-user-email: {{userEmail}}
+}

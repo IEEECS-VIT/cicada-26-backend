@@ -7,6 +7,7 @@ const router = Router();
 // CHANGE 5: All team routes require authentication
 router.use(requireAuth);
 
+router.get('/me', UserTeamController.getMyTeam);
 router.get('/me/members', UserTeamController.getMyTeamMembers);
 router.post('/create', UserTeamController.createTeam);
 router.post('/join', UserTeamController.joinTeam);
