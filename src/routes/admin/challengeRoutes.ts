@@ -38,5 +38,6 @@ router.post('/toggle-ip-blocking', AdminChallengeController.toggleIpTracking);
 router.patch('/ip-tracking', AdminChallengeController.toggleIpTracking);
 router.patch('/ip-blocking', AdminChallengeController.toggleIpTracking);
 router.post('/ip-tracking', AdminChallengeController.toggleIpTracking);
+router.post('/ip-blocking', AdminChallengeController.toggleIpTracking);
 
 export default router;

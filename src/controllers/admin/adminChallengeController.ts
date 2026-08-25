@@ -573,8 +573,8 @@ export class AdminChallengeController {
   }
 
   /**
-   * GET /api/admin/challenges/ip-tracking
    * GET /api/admin/challenges/ip-blocking
+   * GET /api/admin/challenges/ip-tracking
    * Get the current status of IP tracking / location locking
    */
   static async getIpTrackingStatus(req: Request, res: Response): Promise<void> {
@@ -582,40 +582,52 @@ export class AdminChallengeController {
       const enabled = challengeService.isIpTrackingEnabled();
       res.status(200).json({
         success: true,
-        ip_tracking_enabled: enabled,
+        enabled,
         ip_blocking_enabled: enabled,
-        message: `IP tracking / blocking is currently ${enabled ? 'ENABLED' : 'DISABLED'}`,
+        ip_tracking_enabled: enabled,
+        message: `IP blocking is currently ${enabled ? 'ENABLED' : 'DISABLED'}`,
+        data: {
+          enabled,
+          ip_blocking_enabled: enabled,
+          ip_tracking_enabled: enabled,
+        },
       });
     } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message || 'Failed to get IP tracking status' });
+      res.status(500).json({ success: false, error: error.message || 'Failed to get IP blocking status' });
     }
   }
 
   /**
+   * POST /api/admin/challenges/ip-blocking/toggle
    * POST /api/admin/challenges/ip-tracking/toggle
-   * POST /api/admin/challenges/toggle-ip-tracking
-   * PATCH /api/admin/challenges/ip-tracking
-   * Toggle or set the IP tracking / location locking state
+   * Toggle or set the IP blocking state
    */
   static async toggleIpTracking(req: Request, res: Response): Promise<void> {
     try {
       let enabled: boolean;
-      if (req.body && typeof req.body.enabled === 'boolean') {
-        enabled = challengeService.setIpTrackingEnabled(req.body.enabled);
+      const bodyVal = req.body?.enabled ?? req.body?.ip_blocking_enabled ?? req.body?.ip_tracking_enabled;
+      if (typeof bodyVal === 'boolean') {
+        enabled = challengeService.setIpTrackingEnabled(bodyVal);
       } else {
         enabled = challengeService.toggleIpTracking();
       }
 
-      await logAdminActivity(req, 'TOGGLE_IP_TRACKING', { ip_tracking_enabled: enabled });
+      await logAdminActivity(req, 'TOGGLE_IP_BLOCKING', { ip_blocking_enabled: enabled });
 
       res.status(200).json({
         success: true,
-        message: `IP tracking middleware ${enabled ? 'enabled' : 'disabled'} successfully`,
-        ip_tracking_enabled: enabled,
+        enabled,
         ip_blocking_enabled: enabled,
+        ip_tracking_enabled: enabled,
+        message: `IP blocking ${enabled ? 'enabled' : 'disabled'} successfully`,
+        data: {
+          enabled,
+          ip_blocking_enabled: enabled,
+          ip_tracking_enabled: enabled,
+        },
       });
     } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message || 'Failed to toggle IP tracking' });
+      res.status(500).json({ success: false, error: error.message || 'Failed to toggle IP blocking' });
     }
   }
 }
