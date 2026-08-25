@@ -1,0 +1,26 @@
+meta {
+  name: 06_Admin_Adjust_Team_Score
+  type: http
+  seq: 6
+}
+
+patch {
+  url: {{baseUrl}}/api/admin/teams/:id/score
+  body: json
+  auth: none
+}
+
+params:path {
+  id: REPLACE_WITH_TEAM_ID_OR_NAME
+}
+
+headers {
+  x-admin-key: {{adminKey}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "delta": 10
+  }
+}

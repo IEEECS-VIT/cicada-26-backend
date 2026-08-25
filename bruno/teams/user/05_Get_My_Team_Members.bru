@@ -1,0 +1,15 @@
+meta {
+  name: 06_Get_My_Team_Members
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/teams/me/members
+  body: none
+  auth: none
+}
+
+headers {
+  x-user-email: {{userEmail}}
+}

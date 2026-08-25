@@ -189,8 +189,60 @@ export class UserTeamController {
   }
 
   /**
+   * GET /api/teams/me
+   * Fetch current user's team details including invite_code and members
+   */
+  static async getMyTeam(req: Request, res: Response): Promise<void> {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        res.status(401).json({ success: false, error: 'Unauthorized: Authentication required.' });
+        return;
+      }
+
+      if (!user.team_id) {
+        res.status(400).json({ success: false, error: 'You are not currently in any team.' });
+        return;
+      }
+
+      const [team, members] = await Promise.all([
+        db.teams.findById(user.team_id),
+        db.users.findByTeamId(user.team_id)
+      ]);
+
+      if (!team) {
+        res.status(404).json({ success: false, error: 'Team not found.' });
+        return;
+      }
+
+      res.json({
+        success: true,
+        team_id: team.id,
+        team_name: team.name,
+        invite_code: team.invite_code,
+        leader_id: team.leader_id,
+        team: {
+          id: team.id,
+          name: team.name,
+          invite_code: team.invite_code,
+          leader_id: team.leader_id,
+          is_disqualified: team.is_disqualified,
+          points: team.points
+        },
+        members,
+        data: {
+          ...team,
+          members
+        }
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
    * GET /api/teams/me/members
-   * Fetch all members of the user's current team
+   * Fetch all members of the user's current team, along with team info and invite_code
    */
   static async getMyTeamMembers(req: Request, res: Response): Promise<void> {
     try {
@@ -205,10 +257,18 @@ export class UserTeamController {
         return;
       }
 
-      const members = await db.users.findByTeamId(user.team_id);
+      const [team, members] = await Promise.all([
+        db.teams.findById(user.team_id),
+        db.users.findByTeamId(user.team_id)
+      ]);
+
       res.json({
         success: true,
-        data: members
+        invite_code: team ? team.invite_code : null,
+        team_name: team ? team.name : null,
+        team_id: user.team_id,
+        data: members,
+        members
       });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });

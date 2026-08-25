@@ -1,0 +1,15 @@
+meta {
+  name: Delete Challenge (Admin)
+  type: http
+  seq: 18
+}
+
+delete {
+  url: {{baseUrl}}/api/admin/challenges/1
+  body: none
+  auth: none
+}
+
+headers {
+  x-admin-key: {{adminKey}}
+}

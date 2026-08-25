@@ -15,6 +15,7 @@ export interface Team {
   leader_id: string | null;
   invite_code: string;
   is_disqualified: boolean;
+  points?: number;
 }
 
 export interface Challenge {
