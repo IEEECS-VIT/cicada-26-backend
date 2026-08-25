@@ -1,4 +1,6 @@
 import app from '../app.js';
+import { activeSessions } from '../middleware/authMiddleware.js';
+import { v4 as uuidv4 } from 'uuid';
 
 async function runTests() {
   const server = app.listen(5011, async () => {
@@ -6,6 +8,7 @@ async function runTests() {
     const adminKey = process.env.ADMIN_API_KEY || 'sb_secret_PDPDEMJYJko0s5Bg7fP_GQ_hO5TgW09';
     const testTeam = `IP_Test_Team_${Date.now()}`;
     const testUserEmail = `tester_${Date.now()}@example.com`;
+    const sessionToken = uuidv4();
 
     console.log('--- STARTING IP LOCK & URL MASKING VERIFICATION ---');
     console.log('Test Team:', testTeam);
@@ -14,7 +17,7 @@ async function runTests() {
       console.log('\nStep 1: Setting up test user and team...');
       const regRes = await fetch(`${baseUrl}/api/auth/seed-user`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
         body: JSON.stringify({
           email: testUserEmail,
           display_name: 'IP Tester',
@@ -28,12 +31,18 @@ async function runTests() {
 
       const testUserId = regData.id;
 
+      // Add session
+      activeSessions.set(sessionToken, {
+        email: testUserEmail,
+        expiresAt: Date.now() + 3600 * 1000,
+      });
+
       // Create team
       const teamRes = await fetch(`${baseUrl}/api/teams/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-email': testUserEmail
+          Cookie: `session_token=${sessionToken}`
         },
         body: JSON.stringify({ user_id: testUserId, team_name: testTeam })
       });
@@ -46,7 +55,7 @@ async function runTests() {
       console.log('\nStep 2: Activating challenge from IP 1.1.1.1...');
       const startRes = await fetch(`${baseUrl}/api/challenges`, {
         headers: {
-          'x-user-email': testUserEmail,
+          Cookie: `session_token=${sessionToken}`,
           'x-forwarded-for': '1.1.1.1'
         }
       });
@@ -76,7 +85,7 @@ async function runTests() {
           console.log('Fetching masked asset:', maskedAsset.url);
           const assetRes = await fetch(`${baseUrl}${maskedAsset.url}`, {
             headers: {
-              'x-user-email': testUserEmail,
+              Cookie: `session_token=${sessionToken}`,
               'x-forwarded-for': '1.1.1.1'
             }
           });
@@ -95,7 +104,7 @@ async function runTests() {
       console.log('\nStep 4: Accessing challenge from a different IP (2.2.2.2)...');
       const badIpRes = await fetch(`${baseUrl}/api/challenges`, {
         headers: {
-          'x-user-email': testUserEmail,
+          Cookie: `session_token=${sessionToken}`,
           'x-forwarded-for': '2.2.2.2'
         }
       });
@@ -114,11 +123,10 @@ async function runTests() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-email': testUserEmail,
+          Cookie: `session_token=${sessionToken}`,
           'x-forwarded-for': '2.2.2.2'
         },
         body: JSON.stringify({
-          team_name: testTeam,
           challenge_identifier: activeChallenge?.id || 1,
           answer: 'DUMMY_KEY'
         })

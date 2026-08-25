@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import db from '../db.js';
+import { isIpTrackingEnabled, setIpTrackingEnabled, toggleIpTracking } from '../middleware/ipTrackingMiddleware.js';
 import { supabaseChallengeRepository, SupabaseChallengeRepository } from '../database/supabase/supabaseChallengeRepository.js';
 import { supabaseLeaderboardRepository, SupabaseLeaderboardRepository } from '../database/supabase/supabaseLeaderboardRepository.js';
 import {
@@ -87,7 +88,7 @@ export class ChallengeService {
       currentOrder = progress?.current_challenge_order || 1;
 
       // IP Tracking mismatch check
-      if (progress && progress.started_ip && clientIp && progress.started_ip !== clientIp) {
+      if (isIpTrackingEnabled() && progress && progress.started_ip && clientIp && progress.started_ip !== clientIp) {
         throw new Error(`IP_MISMATCH:${progress.started_ip}`);
       }
 
@@ -146,7 +147,7 @@ export class ChallengeService {
       currentOrder = progress?.current_challenge_order || 1;
 
       // IP Tracking mismatch check
-      if (progress && progress.started_ip && clientIp && progress.started_ip !== clientIp) {
+      if (isIpTrackingEnabled() && progress && progress.started_ip && clientIp && progress.started_ip !== clientIp) {
         throw new Error(`IP_MISMATCH:${progress.started_ip}`);
       }
     }
@@ -212,7 +213,7 @@ export class ChallengeService {
     let existingProgress = await this.challengeRepo.getTeamProgress(team_name.trim());
 
     // IP Tracking mismatch check
-    if (existingProgress && existingProgress.started_ip && clientIp && existingProgress.started_ip !== clientIp) {
+    if (isIpTrackingEnabled() && existingProgress && existingProgress.started_ip && clientIp && existingProgress.started_ip !== clientIp) {
       return {
         success: false,
         message: `Access Denied: Answer submission must come from the same IP address that activated the challenge.`,
@@ -581,6 +582,27 @@ export class ChallengeService {
    */
   public async deleteAssetFromChallenge(challengeId: string, assetId: string): Promise<ChallengeAsset[]> {
     return this.challengeRepo.deleteAssetFromChallenge(challengeId, assetId);
+  }
+
+  /**
+   * Check if IP tracking is currently active
+   */
+  public isIpTrackingEnabled(): boolean {
+    return isIpTrackingEnabled();
+  }
+
+  /**
+   * Set IP tracking enabled state
+   */
+  public setIpTrackingEnabled(enabled: boolean): boolean {
+    return setIpTrackingEnabled(enabled);
+  }
+
+  /**
+   * Toggle IP tracking state
+   */
+  public toggleIpTracking(): boolean {
+    return toggleIpTracking();
   }
 }
 

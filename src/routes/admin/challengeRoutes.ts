@@ -28,4 +28,15 @@ router.post('/:id/assets', AdminChallengeController.addAsset);
 router.put('/:id/assets/:assetId', AdminChallengeController.editAsset);
 router.delete('/:id/assets/:assetId', AdminChallengeController.deleteAsset);
 
+// IP Tracking / Location Locking Toggle routes
+router.get('/ip-tracking', AdminChallengeController.getIpTrackingStatus);
+router.get('/ip-blocking', AdminChallengeController.getIpTrackingStatus);
+router.post('/ip-tracking/toggle', AdminChallengeController.toggleIpTracking);
+router.post('/ip-blocking/toggle', AdminChallengeController.toggleIpTracking);
+router.post('/toggle-ip-tracking', AdminChallengeController.toggleIpTracking);
+router.post('/toggle-ip-blocking', AdminChallengeController.toggleIpTracking);
+router.patch('/ip-tracking', AdminChallengeController.toggleIpTracking);
+router.patch('/ip-blocking', AdminChallengeController.toggleIpTracking);
+router.post('/ip-tracking', AdminChallengeController.toggleIpTracking);
+
 export default router;

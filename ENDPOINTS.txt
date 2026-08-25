@@ -75,6 +75,8 @@ All incoming requests are evaluated by security middleware through four supporte
 | `POST` | `/api/admin/challenges/:id/assets`| `requireAdmin`| Add media asset to challenge |
 | `PUT` | `/api/admin/challenges/:id/assets/:assetId`| `requireAdmin`| Replace / edit asset in challenge |
 | `DELETE`| `/api/admin/challenges/:id/assets/:assetId`| `requireAdmin`| Delete asset from challenge |
+| `GET` | `/api/admin/challenges/ip-tracking`| `requireAdmin` | Check current IP tracking / location locking status |
+| `POST` | `/api/admin/challenges/ip-tracking/toggle`| `requireAdmin`| Toggle or configure IP tracking middleware on/off |
 | `GET` | `/api/admin/leaderboard/stream` | `requireAdmin` | Real-time Server-Sent Events (SSE) stream |
 | `GET` | `/api/admin/leaderboard/export` | `requireAdmin` | Export full leaderboard as CSV |
 | `POST` | `/api/admin/leaderboard/submit` | `requireAdmin` | Directly set score for any team |
@@ -720,6 +722,10 @@ All routes require `requireAdmin`.
 - `POST /api/admin/challenges/:id/assets`: Add asset (`image`, `pdf`, `audio`, `video`, `file`, `text`).
 - `PUT /api/admin/challenges/:id/assets/:assetId`: Edit asset.
 - `DELETE /api/admin/challenges/:id/assets/:assetId`: Delete asset.
+
+#### IP Tracking & Location Lock Sub-Routes:
+- `GET /api/admin/challenges/ip-tracking` (and `/ip-blocking`): Returns whether Same-IP location locking middleware is active.
+- `POST /api/admin/challenges/ip-tracking/toggle` (and `/toggle-ip-tracking`, `PATCH /ip-tracking`): Turn IP tracking middleware on or off. Accepts optional `{ "enabled": boolean }`.
 
 ---
 
