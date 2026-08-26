@@ -607,9 +607,9 @@ export class AdminChallengeController {
       let enabled: boolean;
       const bodyVal = req.body?.enabled ?? req.body?.ip_blocking_enabled ?? req.body?.ip_tracking_enabled;
       if (typeof bodyVal === 'boolean') {
-        enabled = challengeService.setIpTrackingEnabled(bodyVal);
+        enabled = await challengeService.setIpTrackingEnabled(bodyVal);
       } else {
-        enabled = challengeService.toggleIpTracking();
+        enabled = await challengeService.toggleIpTracking();
       }
 
       await logAdminActivity(req, 'TOGGLE_IP_BLOCKING', { ip_blocking_enabled: enabled });

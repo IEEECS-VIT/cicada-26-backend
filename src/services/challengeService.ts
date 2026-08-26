@@ -592,16 +592,16 @@ export class ChallengeService {
   }
 
   /**
-   * Set IP tracking enabled state
+   * Set IP tracking enabled state (persisted to the database)
    */
-  public setIpTrackingEnabled(enabled: boolean): boolean {
+  public async setIpTrackingEnabled(enabled: boolean): Promise<boolean> {
     return setIpTrackingEnabled(enabled);
   }
 
   /**
-   * Toggle IP tracking state
+   * Toggle IP tracking state (persisted to the database)
    */
-  public toggleIpTracking(): boolean {
+  public async toggleIpTracking(): Promise<boolean> {
     return toggleIpTracking();
   }
 }
