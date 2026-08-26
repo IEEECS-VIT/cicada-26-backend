@@ -73,6 +73,54 @@ export class AdminTeamController {
   }
 
   /**
+   * PATCH /api/admin/teams/:id
+   * ADMIN ONLY: Update a team's name and/or disqualification status
+   */
+  static async updateTeam(req: Request, res: Response): Promise<void> {
+    const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    if (!rawId) {
+      res.status(400).json({ success: false, error: 'Team ID or name is required' });
+      return;
+    }
+    const team_id_or_name = String(rawId);
+    const { name, is_disqualified } = req.body;
+
+    if (name === undefined && is_disqualified === undefined) {
+      res.status(400).json({ success: false, error: 'At least one of name or is_disqualified is required.' });
+      return;
+    }
+
+    try {
+      let team = await db.teams.findById(team_id_or_name);
+      if (!team) {
+        team = await db.teams.findByName(team_id_or_name);
+      }
+
+      if (!team) {
+        res.status(404).json({ success: false, error: 'Team not found' });
+        return;
+      }
+
+      if (typeof name === 'string' && name.trim() && name.trim() !== team.name) {
+        await db.teams.updateName(team.id, name.trim());
+      }
+
+      if (typeof is_disqualified === 'boolean') {
+        const { error } = await supabase
+          .from('teams')
+          .update({ is_disqualified })
+          .eq('id', team.id);
+        if (error) throw error;
+      }
+
+      await logAdminActivity(req, 'UPDATE_TEAM', { team_id: team.id, name, is_disqualified });
+      res.json({ success: true, message: 'Team updated' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
    * PATCH /api/admin/teams/:id/score
    * ADMIN ONLY: Adjust a team's score directly
    */
