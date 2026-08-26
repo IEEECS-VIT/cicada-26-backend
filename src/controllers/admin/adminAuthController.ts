@@ -262,4 +262,18 @@ export class AdminAuthController {
     const { AdminChallengeController } = await import('./adminChallengeController.js');
     return AdminChallengeController.toggleIpTracking(req, res);
   }
+
+  /**
+   * GET /api/admin/auth/logs
+   * Real, attributed admin activity log (who did what, when)
+   */
+  static async getActivityLogs(req: Request, res: Response): Promise<void> {
+    try {
+      const limit = req.query.limit ? Number(req.query.limit) : 200;
+      const data = await db.adminLogs.getLogs(limit);
+      res.status(200).json({ success: true, message: 'Admin activity logs fetched successfully', data });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message || 'Failed to fetch admin activity logs' });
+    }
+  }
 }

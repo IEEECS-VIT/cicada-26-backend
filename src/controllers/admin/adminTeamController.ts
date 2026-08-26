@@ -36,13 +36,19 @@ export class AdminTeamController {
    */
   static async getAllTeams(req: Request, res: Response): Promise<void> {
     try {
+      // teams<->users has two FK paths (users.team_id -> teams.id for membership,
+      // teams.leader_id -> users.id for leadership) — PostgREST can't disambiguate an
+      // embed without an explicit hint, hence "more than one relationship was found".
+      // users!team_id selects the membership relationship, which is what this endpoint wants.
+      // teams has no created_at column (never added to the schema), so this can't order
+      // by creation time — order by name instead.
       const { data, error } = await supabase
         .from('teams')
         .select(`
-          id, name, invite_code, leader_id, created_at,
-          users:users(id, email, display_name, register_no)
+          id, name, invite_code, leader_id,
+          users:users!team_id(id, email, display_name, register_no)
         `)
-        .order('created_at', { ascending: false });
+        .order('name', { ascending: true });
 
       if (error) throw new Error(error.message);
       res.json({ success: true, data });
@@ -56,15 +62,27 @@ export class AdminTeamController {
    * ADMIN ONLY: Delete team
    */
   static async deleteTeam(req: Request, res: Response): Promise<void> {
-    const { team_id } = req.body;
+    const { team_id, team_name } = req.body;
+    if (!team_id && !team_name) {
+      res.status(400).json({ success: false, error: 'team_id or team_name is required.' });
+      return;
+    }
+
     try {
-      if (!team_id) {
-        res.status(400).json({ success: false, error: 'team_id is required.' });
+      let team = team_id ? await db.teams.findById(team_id) : null;
+      if (!team && team_name) team = await db.teams.findByName(team_name);
+      if (!team && team_id) team = await db.teams.findByName(team_id);
+
+      if (!team) {
+        // No matching row (e.g. a team that only exists via orphaned progress/leaderboard
+        // records) — nothing to delete server-side, but still record the admin's intent.
+        await logAdminActivity(req, 'DELETE_TEAM', { team_id, team_name, note: 'No matching teams row found' });
+        res.status(404).json({ success: false, error: 'Team not found' });
         return;
       }
 
-      await db.teams.deleteTeam(team_id);
-      await logAdminActivity(req, 'DELETE_TEAM', { team_id });
+      await db.teams.deleteTeam(team.id);
+      await logAdminActivity(req, 'DELETE_TEAM', { team_id: team.id, team_name: team.name });
 
       res.json({ success: true, message: 'Team forcefully deleted by admin.' });
     } catch (err: any) {

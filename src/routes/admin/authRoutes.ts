@@ -14,5 +14,6 @@ router.post('/bulk-import-admins', AdminAuthController.bulkImportAdmins);
 router.post('/import-admins', AdminAuthController.bulkImportAdmins);
 router.get('/ip-tracking', AdminAuthController.getIpTrackingStatus);
 router.post('/toggle-ip-tracking', AdminAuthController.toggleIpTracking);
+router.get('/logs', AdminAuthController.getActivityLogs);
 
 export default router;
