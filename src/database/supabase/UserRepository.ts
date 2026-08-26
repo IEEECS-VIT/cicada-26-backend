@@ -82,12 +82,15 @@ export class SupabaseUserRepository implements IUserRepository {
   }
 
   async listAllUsers(): Promise<User[]> {
+    // teams!team_id disambiguates the same way as adminTeamController.getAllTeams — without
+    // it PostgREST throws "more than one relationship was found" (two FK paths exist between
+    // users and teams), which this previously swallowed into a silent empty list.
     const { data, error } = await this.supabase
       .from('users')
-      .select('*, teams(name)')
+      .select('*, teams:teams!team_id(name)')
       .order('created_at', { ascending: false });
 
-    if (error) return [];
+    if (error) throw new Error(`Failed to list users: ${error.message}`);
     return data as any[];
   }
 
