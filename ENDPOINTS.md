@@ -45,6 +45,7 @@ All incoming requests are evaluated by security middleware through four supporte
 | `POST` | `/api/teams/update-name` | `requireAuth` | Rename team (Team Leader only) |
 | `POST` | `/api/teams/leave` | `requireAuth` | Leave current team (non-leader members only) |
 | `GET` | `/api/challenges` | `requireAuth` | List active challenges with sequential lock status |
+| `GET` | `/api/challenges/rounds` | `requireAuth` | List active rounds with lock status & round story fragments |
 | `GET` | `/api/challenges/:identifier` | `requireAuth` | Get single challenge by order number or UUID |
 | `POST` | `/api/challenges/submit` | `requireAuth` | Submit answer (rate-limited, sequential unlock, score sync) |
 | `GET` | `/api/challenges/progress` | `requireAuth` | Participant progression state recovery endpoint |
@@ -65,6 +66,11 @@ All incoming requests are evaluated by security middleware through four supporte
 | `POST` | `/api/admin/challenges` | `requireAdmin` | Create a new challenge record |
 | `PUT` | `/api/admin/challenges/:id` | `requireAdmin` | Update challenge attributes |
 | `DELETE`| `/api/admin/challenges/:id` | `requireAdmin` | Delete challenge record |
+| `GET` | `/api/admin/challenges/rounds` | `requireAdmin` | List all rounds (including inactive) |
+| `POST` | `/api/admin/challenges/rounds` | `requireAdmin` | Create a new round |
+| `POST` | `/api/admin/challenges/rounds/reorder`| `requireAdmin`| Reorder rounds by ordered ID list |
+| `PUT` | `/api/admin/challenges/rounds/:id` | `requireAdmin` | Update round attributes |
+| `DELETE`| `/api/admin/challenges/rounds/:id` | `requireAdmin` | Delete round (no challenges assigned) |
 | `POST` | `/api/admin/challenges/override`| `requireAdmin` | Force unlock challenge progression for a team |
 | `POST` | `/api/admin/challenges/reset-team`| `requireAdmin`| Reset team progress back to challenge 1 |
 | `GET` | `/api/admin/challenges/submission-logs`| `requireAdmin`| Query answer submission audit logs |
@@ -417,7 +423,34 @@ All participant challenge routes enforce `requireAuth`.
             "is_visible": true
           }
         ],
+        "round_id": "9d2b4f1a-3c5e-4a7b-8f90-1a2b3c4d5e6f",
+        "round_name": "Round 1",
+        "round_order": 1,
         "is_active": true,
+        "is_locked": false
+      }
+    ]
+  }
+  ```
+
+#### `GET /api/challenges/rounds`
+- **Access**: `requireAuth`
+- **Description**: Lists active rounds. Rounds the team has not entered yet are masked (only `id`, `name`, `order_number`, `is_locked` returned; `story_fragment` is `null`).
+- **Query Parameters**: `team_name` (optional, defaults to authenticated user's team)
+- **Response `200 OK`**:
+  ```json
+  {
+    "success": true,
+    "message": "Rounds fetched successfully",
+    "data": [
+      {
+        "id": "9d2b4f1a-3c5e-4a7b-8f90-1a2b3c4d5e6f",
+        "name": "Round 1",
+        "order_number": 1,
+        "story_fragment": {
+          "title": "Recovered Mission Log",
+          "content": "Signal acquisition established."
+        },
         "is_locked": false
       }
     ]
@@ -466,7 +499,7 @@ All participant challenge routes enforce `requireAuth`.
 
 #### `GET /api/challenges/progress`
 - **Access**: `requireAuth`
-- **Description**: Participant state recovery endpoint for session resumption post-logout.
+- **Description**: Participant state recovery endpoint for session resumption post-logout. Includes the team's current round and one story fragment per round entered.
 - **Query Parameters**: `team_name` (optional)
 - **Response `200 OK`**:
   ```json
@@ -475,12 +508,13 @@ All participant challenge routes enforce `requireAuth`.
     "data": {
       "team_name": "CyberKnights",
       "current_challenge_order": 2,
+      "current_round_order": 1,
       "completed_challenges": [1],
       "challenges_solved": 1,
       "unlocked_story_fragments": [
         {
-          "challenge_order": 1,
-          "challenge_name": "Archive 01: Transmission Beacon",
+          "round_order": 1,
+          "round_name": "Round 1",
           "story_fragment": {
             "title": "Mission Log #102",
             "content": "Signal acquisition established."
@@ -493,9 +527,9 @@ All participant challenge routes enforce `requireAuth`.
 
 #### `GET /api/challenges/story-fragments`
 - **Access**: `requireAuth`
-- **Description**: Archive page endpoint returning all unlocked story fragments solved by the team.
+- **Description**: Archive page endpoint returning the unlocked story fragments of all rounds the team has entered (one per round).
 - **Query Parameters**: `team_name` (optional)
-- **Response `200 OK`**: Array of unlocked story fragments.
+- **Response `200 OK`**: Array of `{ round_order, round_name, story_fragment }` objects.
 
 #### `GET /api/challenges/assets/masked`
 - **Access**: `requireAuth`
@@ -656,7 +690,7 @@ All routes require `requireAdmin`.
 
 #### `POST /api/admin/challenges`
 - **Access**: `requireAdmin`
-- **Description**: Creates a new challenge record with assets, hints, and story fragment.
+- **Description**: Creates a new challenge record with assets and hints. Story fragments live on rounds, not challenges.
 - **Request Body**:
   ```json
   {
@@ -669,15 +703,13 @@ All routes require `requireAdmin`.
     "hints": [
       { "text": "Inspect the radio frequency.", "is_visible": true }
     ],
-    "story_fragment": {
-      "title": "Deciphered Log Entry",
-      "content": "All vaults unsealed."
-    },
+    "round_id": "9d2b4f1a-3c5e-4a7b-8f90-1a2b3c4d5e6f",
     "answer_key": "VAULT_OPEN_2026",
     "time_limit": 1800,
     "is_active": true
   }
   ```
+  - `round_id` is optional; when omitted the challenge is assigned to the lowest-ordered round.
 
 #### `PUT /api/admin/challenges/:id`
 - **Access**: `requireAdmin`
@@ -726,6 +758,14 @@ All routes require `requireAdmin`.
 #### IP Tracking & Location Lock Sub-Routes:
 - `GET /api/admin/challenges/ip-tracking` (and `/ip-blocking`): Returns whether Same-IP location locking middleware is active.
 - `POST /api/admin/challenges/ip-tracking/toggle` (and `/toggle-ip-tracking`, `PATCH /ip-tracking`): Turn IP tracking middleware on or off. Accepts optional `{ "enabled": boolean }`.
+
+#### Round Management Sub-Routes:
+Rounds group challenges into themed stages; each round owns the `story_fragment` shown the moment a team enters the round.
+- `GET /api/admin/challenges/rounds`: List all rounds (including inactive), with fragments.
+- `POST /api/admin/challenges/rounds`: Create a round. Body: `{ "name": "Round 3", "order_number": 3, "story_fragment": {...}, "is_active": true }`. `order_number` defaults to max + 1; `story_fragment` defaults to `{}`.
+- `POST /api/admin/challenges/rounds/reorder`: Reorder rounds. Body: `{ "ordered_ids": ["uuid", ...] }` (all round UUIDs in desired order).
+- `PUT /api/admin/challenges/rounds/:id`: Update round name, order number, story fragment, or active status.
+- `DELETE /api/admin/challenges/rounds/:id`: Delete a round. Returns `400` if challenges are still assigned to it.
 
 ---
 

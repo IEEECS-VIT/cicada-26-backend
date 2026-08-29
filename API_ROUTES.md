@@ -90,16 +90,22 @@ Returned when an unhandled server error or database query failure occurs.
 | Method | Endpoint | Access Level | Description |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/challenges` | Public | Fetch active public challenges (optional `team_name` query for lock status) |
+| `GET` | `/api/challenges/rounds` | Public | Fetch active rounds with per-team lock status and round story fragments |
 | `GET` | `/api/challenges/:identifier` | Public | Fetch challenge details by order number or UUID |
 | `POST` | `/api/challenges/submit` | Public | Submit challenge response for validation and automated score sync |
 | `GET` | `/api/challenges/progress` | Public | Participant state recovery endpoint for post-logout session resume |
-| `GET` | `/api/challenges/story-fragments` | Public | Archive page: Retrieve all unlocked story fragments for a team |
+| `GET` | `/api/challenges/story-fragments` | Public | Archive page: Retrieve all unlocked round story fragments for a team |
 | `GET` | `/api/challenges/admin/progress` | Admin | Detailed progress tracking matrix across all teams |
 | `POST` | `/api/challenges/admin/override` | Admin | Force-unlock any challenge order for a specific team |
 | `GET` | `/api/challenges/admin/all` | Admin | Fetch all challenge records including answer keys |
 | `POST` | `/api/challenges/admin` | Admin | Create a new challenge record |
 | `PUT` | `/api/challenges/admin/:id` | Admin | Modify challenge attributes |
 | `DELETE` | `/api/challenges/admin/:id` | Admin | Delete a challenge record |
+| `GET` | `/api/admin/challenges/rounds` | Admin | Fetch all rounds (including inactive) |
+| `POST` | `/api/admin/challenges/rounds` | Admin | Create a new round |
+| `POST` | `/api/admin/challenges/rounds/reorder` | Admin | Reorder rounds by ordered ID list |
+| `PUT` | `/api/admin/challenges/rounds/:id` | Admin | Modify round attributes |
+| `DELETE` | `/api/admin/challenges/rounds/:id` | Admin | Delete a round (must have no assigned challenges) |
 
 ---
 
@@ -189,7 +195,7 @@ Establishes a persistent streaming connection for real-time telemetry updates.
 ---
 
 ### 4. Public Active Challenges
-Returns active challenges with associated story contexts and media payloads (Images, PDFs, Audio, Video, Files, Text). Answer keys are excluded.
+Returns active challenges with associated story contexts and media payloads (Images, PDFs, Audio, Video, Files, Text). Answer keys are excluded. Challenges are grouped into rounds; each unlocked challenge carries the story fragment of its round (only for rounds the team has entered).
 
 - **Method**: `GET`
 - **Path**: `/api/challenges`
@@ -212,6 +218,9 @@ Returns active challenges with associated story contexts and media payloads (Ima
           { "type": "text", "content": "Signal Payload: 0x4369636164613236" },
           { "type": "image", "url": "https://images.unsplash.com/photo-1518770660439-4636190af475", "name": "Beacon Spectrum Analysis" }
         ],
+        "round_id": "9d2b4f1a-3c5e-4a7b-8f90-1a2b3c4d5e6f",
+        "round_name": "Round 1",
+        "round_order": 1,
         "story_fragment": {
           "title": "Recovered Mission Log",
           "header": "Day 102",
@@ -254,6 +263,9 @@ Retrieves detailed information for a single challenge by order number or UUID.
       "name": "Archive 01: Transmission Beacon",
       "story_context": "A hidden transmission was intercepted...",
       "assets": [],
+      "round_id": "9d2b4f1a-3c5e-4a7b-8f90-1a2b3c4d5e6f",
+      "round_name": "Round 1",
+      "round_order": 1,
       "story_fragment": {
         "title": "Recovered Mission Log",
         "content": "Signal acquisition established."
@@ -292,6 +304,7 @@ Validates participant input against challenge solution requirements.
 - Enforces strict sequential challenge progression (blocks out-of-order attempts).
 - Enforces a sliding window rate limit of **5 attempts per minute per IP and Team Name** to mitigate key brute-forcing.
 - Automatically increments attempt telemetry, updates team progress, unlocks the next challenge, and updates live leaderboard metrics upon success.
+- When the solved challenge was the last one of its round, the response includes the story fragment of the next round.
 
 - **Method**: `POST`
 - **Path**: `/api/challenges/submit`
@@ -320,6 +333,8 @@ Validates participant input against challenge solution requirements.
     }
   }
   ```
+
+  *`story_fragment` is only present when the solved challenge was the last of its round and the next challenge starts a new round. It contains the intro fragment of the newly entered round.*
 
 - **Response `400 Bad Request` (Incorrect Solution)**:
   ```json
@@ -359,7 +374,7 @@ Validates participant input against challenge solution requirements.
 ---
 
 ### 7. Participant Session State Recovery
-Retrieves current progression metrics and unlocked story fragments to support seamless session resumption following logout.
+Retrieves current progression metrics and unlocked round story fragments to support seamless session resumption following logout.
 
 - **Method**: `GET`
 - **Path**: `/api/challenges/progress`
@@ -375,12 +390,13 @@ Retrieves current progression metrics and unlocked story fragments to support se
     "data": {
       "team_name": "CyberKnights",
       "current_challenge_order": 2,
+      "current_round_order": 1,
       "completed_challenges": [1],
       "challenges_solved": 1,
       "unlocked_story_fragments": [
         {
-          "challenge_order": 1,
-          "challenge_name": "Archive 01: Transmission Beacon",
+          "round_order": 1,
+          "round_name": "Round 1",
           "story_fragment": {
             "title": "Recovered Mission Log",
             "header": "Day 102",
@@ -391,6 +407,8 @@ Retrieves current progression metrics and unlocked story fragments to support se
     }
   }
   ```
+
+  *`unlocked_story_fragments` contains one entry per round the team has entered (rounds whose `order_number` is at or below `current_round_order`).*
 
 - **Response `400 Bad Request` (Missing Parameter)**:
   ```json
@@ -403,7 +421,7 @@ Retrieves current progression metrics and unlocked story fragments to support se
 ---
 
 ### 8. Unlocked Story Fragments (Archive)
-Retrieves unlocked story fragments associated with solved challenges for display on the Archive page.
+Retrieves unlocked round story fragments (one per round the team has entered) for display on the Archive page.
 
 - **Method**: `GET`
 - **Path**: `/api/challenges/story-fragments`
@@ -418,8 +436,8 @@ Retrieves unlocked story fragments associated with solved challenges for display
     "message": "Unlocked story fragments for team 'CyberKnights' fetched successfully",
     "data": [
       {
-        "challenge_order": 1,
-        "challenge_name": "Archive 01: Transmission Beacon",
+        "round_order": 1,
+        "round_name": "Round 1",
         "story_fragment": {
           "title": "Recovered Mission Log",
           "header": "Day 102",
@@ -462,7 +480,7 @@ Provides a comprehensive progress matrix across all participating teams.
         "completion_time": "2026-07-20T12:00:00.000Z",
         "attempts_count": 3,
         "last_attempt_at": "2026-07-20T12:05:00.000Z",
-        "story_progress": "1 / 3 fragments unlocked",
+        "story_progress": "1 / 2 rounds · 1 / 6 challenges",
         "completed_challenges": [1]
       }
     ]
@@ -571,7 +589,7 @@ Retrieves all challenge records including answer keys for administrative inspect
 ---
 
 ### 12. Create Challenge Record (Admin)
-Creates a new challenge record with associated assets and story fragments.
+Creates a new challenge record with associated assets. Story fragments live on rounds (see `POST /api/admin/challenges/rounds`), not on challenges.
 
 - **Method**: `POST`
 - **Path**: `/api/challenges/admin`
@@ -591,15 +609,14 @@ Creates a new challenge record with associated assets and story fragments.
         "name": "Orbital Map Image"
       }
     ],
-    "story_fragment": {
-      "title": "Deciphered Log Entry",
-      "content": "All vaults unsealed."
-    },
+    "round_id": "9d2b4f1a-3c5e-4a7b-8f90-1a2b3c4d5e6f",
     "answer_key": "VAULT_OPEN_2026",
     "time_limit": 1800,
     "is_active": true
   }
   ```
+
+  *`round_id` is optional; when omitted the challenge is assigned to the lowest-ordered round.*
 
 #### Possible Outcomes:
 
@@ -913,6 +930,282 @@ Deletes a team record from the leaderboard database.
 ---
 
 ### 19. Reset Leaderboard (Admin)
+Resets all leaderboard team records in the backend.
+
+- **Method**: `POST`
+- **Path**: `/api/leaderboard/reset`
+- **Headers**: `x-admin-key: <ADMIN_API_KEY>`
+
+#### Possible Outcomes:
+
+- **Response `200 OK` (Success)**:
+  ```json
+  {
+    "success": true,
+    "message": "Leaderboard reset successfully across Supabase backend"
+  }
+  ```
+
+- **Response `401 Unauthorized`**:
+  ```json
+  {
+    "success": false,
+    "error": "Unauthorized: Invalid or missing Admin API Key (x-admin-key header)"
+  }
+  ```
+
+---
+
+### 20. Public Active Rounds
+Returns active rounds with story fragments. Rounds the team has not entered yet are masked: only `id`, `name`, `order_number`, and `is_locked` are returned, and `story_fragment` is `null`.
+
+- **Method**: `GET`
+- **Path**: `/api/challenges/rounds`
+- **Query Parameters**: `team_name` (Optional - evaluates `is_locked` status per team)
+
+#### Possible Outcomes:
+
+- **Response `200 OK` (Success)**:
+  ```json
+  {
+    "success": true,
+    "message": "Rounds fetched successfully",
+    "data": [
+      {
+        "id": "9d2b4f1a-3c5e-4a7b-8f90-1a2b3c4d5e6f",
+        "name": "Round 1",
+        "order_number": 1,
+        "story_fragment": {
+          "title": "Recovered Mission Log",
+          "header": "Day 102",
+          "content": "Signal acquisition established."
+        },
+        "is_locked": false
+      },
+      {
+        "id": "4c5d6e7f-8a9b-0c1d-2e3f-4a5b6c7d8e9f",
+        "name": "Round 2",
+        "order_number": 2,
+        "story_fragment": null,
+        "is_locked": true
+      }
+    ]
+  }
+  ```
+
+- **Response `500 Internal Server Error`**:
+  ```json
+  {
+    "success": false,
+    "error": "Failed to fetch rounds"
+  }
+  ```
+
+---
+
+### 21. Admin Round Management
+Rounds group challenges into themed stages. Each round owns the `story_fragment` shown to participants the moment they enter the round (its first challenge becomes unlocked). Deleting a round is only allowed when no challenges are assigned to it.
+
+#### 21.1 Fetch All Rounds (Admin)
+
+- **Method**: `GET`
+- **Path**: `/api/admin/challenges/rounds`
+- **Headers**: `x-admin-key: <ADMIN_API_KEY>`
+
+##### Possible Outcomes:
+
+- **Response `200 OK` (Success)**:
+  ```json
+  {
+    "success": true,
+    "message": "Rounds fetched successfully",
+    "data": [
+      {
+        "id": "9d2b4f1a-3c5e-4a7b-8f90-1a2b3c4d5e6f",
+        "name": "Round 1",
+        "order_number": 1,
+        "story_fragment": {
+          "title": "Recovered Mission Log",
+          "content": "Signal acquisition established."
+        },
+        "is_active": true,
+        "created_at": "2026-07-20T12:00:00.000Z",
+        "updated_at": "2026-07-20T12:00:00.000Z"
+      }
+    ]
+  }
+  ```
+
+- **Response `401 Unauthorized`**:
+  ```json
+  {
+    "success": false,
+    "error": "Unauthorized: Invalid or missing Admin API Key (x-admin-key header)"
+  }
+  ```
+
+#### 21.2 Create Round (Admin)
+
+- **Method**: `POST`
+- **Path**: `/api/admin/challenges/rounds`
+- **Headers**:
+  - `x-admin-key: <ADMIN_API_KEY>`
+  - `Content-Type: application/json`
+- **Body**:
+  ```json
+  {
+    "name": "Round 3",
+    "order_number": 3,
+    "story_fragment": {
+      "title": "Deep Space Relay",
+      "content": "The relay wakes up..."
+    },
+    "is_active": true
+  }
+  ```
+
+##### Possible Outcomes:
+
+- **Response `201 Created` (Success)**:
+  ```json
+  {
+    "success": true,
+    "message": "Round 'Round 3' created successfully",
+    "data": {
+      "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "name": "Round 3",
+      "order_number": 3,
+      "is_active": true
+    }
+  }
+  ```
+
+  *`order_number` is optional; when omitted it defaults to the current maximum round order plus one. `story_fragment` is optional and defaults to `{}`.*
+
+- **Response `401 Unauthorized`**:
+  ```json
+  {
+    "success": false,
+    "error": "Unauthorized: Invalid or missing Admin API Key (x-admin-key header)"
+  }
+  ```
+
+#### 21.3 Reorder Rounds (Admin)
+
+- **Method**: `POST`
+- **Path**: `/api/admin/challenges/rounds/reorder`
+- **Headers**:
+  - `x-admin-key: <ADMIN_API_KEY>`
+  - `Content-Type: application/json`
+- **Body**:
+  ```json
+  {
+    "ordered_ids": [
+      "4c5d6e7f-8a9b-0c1d-2e3f-4a5b6c7d8e9f",
+      "9d2b4f1a-3c5e-4a7b-8f90-1a2b3c4d5e6f"
+    ]
+  }
+  ```
+
+##### Possible Outcomes:
+
+- **Response `200 OK` (Success)**:
+  ```json
+  {
+    "success": true,
+    "message": "Rounds reordered successfully"
+  }
+  ```
+
+- **Response `401 Unauthorized`**:
+  ```json
+  {
+    "success": false,
+    "error": "Unauthorized: Invalid or missing Admin API Key (x-admin-key header)"
+  }
+  ```
+
+#### 21.4 Update Round (Admin)
+
+- **Method**: `PUT`
+- **Path**: `/api/admin/challenges/rounds/:id`
+- **Headers**:
+  - `x-admin-key: <ADMIN_API_KEY>`
+  - `Content-Type: application/json`
+- **Body**:
+  ```json
+  {
+    "name": "Round 1 - Recalibrated",
+    "story_fragment": {
+      "title": "Recovered Mission Log",
+      "content": "Signal acquisition established. Relay stabilized."
+    }
+  }
+  ```
+
+##### Possible Outcomes:
+
+- **Response `200 OK` (Success)**:
+  ```json
+  {
+    "success": true,
+    "message": "Round updated successfully",
+    "data": {
+      "id": "9d2b4f1a-3c5e-4a7b-8f90-1a2b3c4d5e6f",
+      "name": "Round 1 - Recalibrated",
+      "order_number": 1,
+      "is_active": true
+    }
+  }
+  ```
+
+- **Response `404 Not Found`**:
+  ```json
+  {
+    "success": false,
+    "error": "Round not found"
+  }
+  ```
+
+- **Response `401 Unauthorized`**:
+  ```json
+  {
+    "success": false,
+    "error": "Unauthorized: Invalid or missing Admin API Key (x-admin-key header)"
+  }
+  ```
+
+#### 21.5 Delete Round (Admin)
+
+- **Method**: `DELETE`
+- **Path**: `/api/admin/challenges/rounds/:id`
+- **Headers**: `x-admin-key: <ADMIN_API_KEY>`
+
+##### Possible Outcomes:
+
+- **Response `200 OK` (Success)**:
+  ```json
+  {
+    "success": true,
+    "message": "Round deleted successfully"
+  }
+  ```
+
+- **Response `400 Bad Request` (Round Still Has Challenges)**:
+  ```json
+  {
+    "success": false,
+    "error": "Cannot delete round with 3 challenge(s) assigned. Reassign or delete them first."
+  }
+  ```
+
+- **Response `401 Unauthorized`**:
+  ```json
+  {
+    "success": false,
+    "error": "Unauthorized: Invalid or missing Admin API Key (x-admin-key header)"
+  }
+  ```
 Resets all leaderboard team records in the backend.
 
 - **Method**: `POST`

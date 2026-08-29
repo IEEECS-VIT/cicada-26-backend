@@ -14,7 +14,6 @@ const getClientIp = (req: Request): string => {
   return req.ip || req.socket?.remoteAddress || '127.0.0.1';
 };
 
-// SSRF protection for proxying challenge assets.
 const MAX_ASSET_BYTES = 20 * 1024 * 1024; // 20MB
 const ASSET_FETCH_TIMEOUT_MS = 15000;
 
@@ -104,6 +103,32 @@ export class UserChallengeController {
         return;
       }
       res.status(500).json({ success: false, error: error.message || 'Failed to fetch challenges' });
+    }
+  }
+
+  /**
+   * GET /api/challenges/rounds
+   * List rounds with per-team lock state. A round's story fragment is only
+   * revealed once the team has entered it.
+   */
+  static async getPublicRounds(req: Request, res: Response): Promise<void> {
+    try {
+      const user = (req as any).user;
+      let team_name: string | undefined;
+
+      if (user?.team_id) {
+        const team = await db.teams.findById(user.team_id);
+        if (team) team_name = team.name;
+      }
+
+      const data = await challengeService.getPublicRounds(team_name);
+      res.status(200).json({
+        success: true,
+        message: 'Rounds fetched successfully',
+        data,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message || 'Failed to fetch rounds' });
     }
   }
 

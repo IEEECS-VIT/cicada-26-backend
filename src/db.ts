@@ -10,6 +10,14 @@ import { IUserRepository, ITeamRepository, IChallengeRepository, ITeamProgressRe
 
 dotenv.config();
 
+// Node <22 has no native WebSocket, which @supabase/realtime-js requires at
+// client construction. Fall back to the `ws` package (transitively installed)
+// so the app keeps working on Node 20.
+if (!globalThis.WebSocket) {
+  const { WebSocket } = require('ws') as { WebSocket: typeof globalThis.WebSocket };
+  globalThis.WebSocket = WebSocket;
+}
+
 // ---------------------------------------------------------------------------
 // Startup guard — fail fast if critical env vars are missing
 // ---------------------------------------------------------------------------

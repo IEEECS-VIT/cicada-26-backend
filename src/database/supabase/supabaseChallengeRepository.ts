@@ -10,6 +10,9 @@ import {
   UpdateChallengeDto,
   ChallengeHint,
   ChallengeAsset,
+  Round,
+  CreateRoundDto,
+  UpdateRoundDto,
 } from '../../types/challenge.js';
 
 export class SupabaseChallengeRepository implements IChallengeRepository {
@@ -47,12 +50,24 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
   }
 
   /**
+   * Parse the joined rounds object into flat round fields
+   */
+  private parseRoundInfo(joined: any): { round_id: string | null; round_name: string | null; round_order: number | null } {
+    if (!joined) return { round_id: null, round_name: null, round_order: null };
+    return {
+      round_id: joined.id || null,
+      round_name: joined.name || null,
+      round_order: typeof joined.order_number === 'number' ? joined.order_number : null,
+    };
+  }
+
+  /**
    * Fetch all active challenges for public (excluding answer_key)
    */
   public async getPublicChallenges(): Promise<ChallengePublic[]> {
     const { data, error } = await supabase
       .from('challenges')
-      .select('id, order_number, name, story_context, assets, story_fragment, hints, time_limit, is_active, created_at, updated_at')
+      .select('id, round_id, order_number, name, story_context, assets, hints, time_limit, is_active, created_at, updated_at, rounds(id, name, order_number)')
       .eq('is_active', true)
       .order('order_number', { ascending: true });
 
@@ -65,10 +80,11 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
         ? JSON.parse(item.hints)
         : item.hints || [];
       const visibleHints = allHints.filter(h => h.is_visible);
+      const { rounds, ...rest } = item as any;
       return {
-        ...item,
+        ...rest,
+        ...this.parseRoundInfo(rounds),
         assets: typeof item.assets === 'string' ? JSON.parse(item.assets) : item.assets || [],
-        story_fragment: typeof item.story_fragment === 'string' ? JSON.parse(item.story_fragment) : item.story_fragment || null,
         hints: visibleHints,
       };
     }) as ChallengePublic[];
@@ -80,7 +96,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
   public async getPublicChallengeByIdentifier(identifier: string | number): Promise<ChallengePublic | null> {
     let query = supabase
       .from('challenges')
-      .select('id, order_number, name, story_context, assets, story_fragment, hints, time_limit, is_active, created_at, updated_at')
+      .select('id, round_id, order_number, name, story_context, assets, hints, time_limit, is_active, created_at, updated_at, rounds(id, name, order_number)')
       .eq('is_active', true);
 
     if (this.isUuid(identifier)) {
@@ -106,10 +122,11 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
       : data.hints || [];
     const visibleHints = allHints.filter(h => h.is_visible);
 
+    const { rounds, ...rest } = data as any;
     return {
-      ...data,
+      ...rest,
+      ...this.parseRoundInfo(rounds),
       assets: typeof data.assets === 'string' ? JSON.parse(data.assets) : data.assets || [],
-      story_fragment: typeof data.story_fragment === 'string' ? JSON.parse(data.story_fragment) : data.story_fragment || null,
       hints: visibleHints,
     } as ChallengePublic;
   }
@@ -118,7 +135,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
    * Fetch single challenge including answer_key for verification
    */
   public async getChallengeWithAnswerKey(identifier: string | number): Promise<Challenge | null> {
-    let query = supabase.from('challenges').select('*');
+    let query = supabase.from('challenges').select('*, rounds(id, name, order_number)');
 
     if (this.isUuid(identifier)) {
       query = query.eq('id', identifier);
@@ -138,10 +155,11 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
 
     if (!data) return null;
 
+    const { rounds, ...rest } = data as any;
     return {
-      ...data,
+      ...rest,
+      ...this.parseRoundInfo(rounds),
       assets: typeof data.assets === 'string' ? JSON.parse(data.assets) : data.assets || [],
-      story_fragment: typeof data.story_fragment === 'string' ? JSON.parse(data.story_fragment) : data.story_fragment || null,
       hints: typeof data.hints === 'string' ? JSON.parse(data.hints) : data.hints || [],
     } as Challenge;
   }
@@ -152,31 +170,45 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
   public async getAllChallengesAdmin(): Promise<Challenge[]> {
     const { data, error } = await supabase
       .from('challenges')
-      .select('*')
+      .select('*, rounds(id, name, order_number)')
       .order('order_number', { ascending: true });
 
     if (error) {
       throw new Error(`Failed to fetch all challenges for admin: ${error.message}`);
     }
 
-    return (data || []).map((item) => ({
-      ...item,
-      assets: typeof item.assets === 'string' ? JSON.parse(item.assets) : item.assets || [],
-      story_fragment: typeof item.story_fragment === 'string' ? JSON.parse(item.story_fragment) : item.story_fragment || null,
-      hints: typeof item.hints === 'string' ? JSON.parse(item.hints) : item.hints || [],
-    })) as Challenge[];
+    return (data || []).map((item) => {
+      const { rounds, ...rest } = item as any;
+      return {
+        ...rest,
+        ...this.parseRoundInfo(rounds),
+        assets: typeof item.assets === 'string' ? JSON.parse(item.assets) : item.assets || [],
+        hints: typeof item.hints === 'string' ? JSON.parse(item.hints) : item.hints || [],
+      };
+    }) as Challenge[];
   }
 
   /**
    * Create a new challenge (Admin)
    */
   public async createChallenge(dto: CreateChallengeDto): Promise<Challenge> {
+    let roundId: string | null = dto.round_id ?? null;
+    if (!roundId) {
+      const { data: firstRound } = await supabase
+        .from('rounds')
+        .select('id')
+        .order('order_number', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      roundId = firstRound?.id ?? null;
+    }
+
     const payload = {
+      round_id: roundId,
       order_number: dto.order_number,
       name: dto.name,
       story_context: dto.story_context || '',
       assets: dto.assets || [],
-      story_fragment: dto.story_fragment || {},
       hints: dto.hints || [],
       answer_key: dto.answer_key,
       time_limit: dto.time_limit !== undefined ? dto.time_limit : 1800,
@@ -196,7 +228,6 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
     return {
       ...data,
       assets: typeof data.assets === 'string' ? JSON.parse(data.assets) : data.assets || [],
-      story_fragment: typeof data.story_fragment === 'string' ? JSON.parse(data.story_fragment) : data.story_fragment || null,
       hints: typeof data.hints === 'string' ? JSON.parse(data.hints) : data.hints || [],
     } as Challenge;
   }
@@ -205,7 +236,8 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
    * Update challenge (Admin)
    */
   public async updateChallenge(identifier: string, dto: UpdateChallengeDto): Promise<Challenge | null> {
-    let query = supabase.from('challenges').update(dto);
+    const { story_fragment: _storyFragment, ...updatePayload } = dto;
+    let query = supabase.from('challenges').update(updatePayload);
 
     if (this.isUuid(identifier)) {
       query = query.eq('id', identifier);
@@ -217,7 +249,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
       query = query.eq('order_number', orderNum);
     }
 
-    const { data, error } = await query.select().maybeSingle();
+    const { data, error } = await query.select('*, rounds(id, name, order_number)').maybeSingle();
 
     if (error) {
       throw new Error(`Failed to update challenge '${identifier}': ${error.message}`);
@@ -225,10 +257,11 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
 
     if (!data) return null;
 
+    const { rounds, ...rest } = data as any;
     return {
-      ...data,
+      ...rest,
+      ...this.parseRoundInfo(rounds),
       assets: typeof data.assets === 'string' ? JSON.parse(data.assets) : data.assets || [],
-      story_fragment: typeof data.story_fragment === 'string' ? JSON.parse(data.story_fragment) : data.story_fragment || null,
       hints: typeof data.hints === 'string' ? JSON.parse(data.hints) : data.hints || [],
     } as Challenge;
   }
@@ -698,6 +731,176 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
     }
 
     return updatedAssets;
+  }
+
+  private parseRoundFragment(raw: any): any {
+    if (typeof raw === 'string') {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }
+    return raw || null;
+  }
+
+  /**
+   * Fetch all rounds ordered by order_number
+   */
+  public async getRounds(): Promise<Round[]> {
+    const { data, error } = await supabase
+      .from('rounds')
+      .select('*')
+      .order('order_number', { ascending: true });
+
+    if (error) {
+      throw new Error(`Failed to fetch rounds: ${error.message}`);
+    }
+
+    return (data || []).map((item) => ({
+      ...item,
+      story_fragment: this.parseRoundFragment(item.story_fragment),
+    })) as Round[];
+  }
+
+  /**
+   * Fetch a single round by UUID or order_number
+   */
+  public async getRoundByIdentifier(identifier: string | number): Promise<Round | null> {
+    let query = supabase.from('rounds').select('*');
+
+    if (this.isUuid(identifier)) {
+      query = query.eq('id', identifier);
+    } else {
+      const orderNum = typeof identifier === 'number' ? identifier : parseInt(identifier, 10);
+      if (isNaN(orderNum)) {
+        return null;
+      }
+      query = query.eq('order_number', orderNum);
+    }
+
+    const { data, error } = await query.maybeSingle();
+
+    if (error) {
+      throw new Error(`Failed to fetch round '${identifier}': ${error.message}`);
+    }
+
+    if (!data) return null;
+
+    return {
+      ...data,
+      story_fragment: this.parseRoundFragment(data.story_fragment),
+    } as Round;
+  }
+
+  /**
+   * Create a new round (Admin). order_number auto-assigns to max + 1 when omitted.
+   */
+  public async createRound(dto: CreateRoundDto): Promise<Round> {
+    let orderNumber = dto.order_number;
+    if (orderNumber === undefined) {
+      const { data: lastRound } = await supabase
+        .from('rounds')
+        .select('order_number')
+        .order('order_number', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      orderNumber = (lastRound?.order_number || 0) + 1;
+    }
+
+    const payload = {
+      name: dto.name,
+      order_number: orderNumber,
+      story_fragment: dto.story_fragment || {},
+      is_active: dto.is_active !== undefined ? dto.is_active : true,
+    };
+
+    const { data, error } = await supabase
+      .from('rounds')
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to create round: ${error.message}`);
+    }
+
+    return {
+      ...data,
+      story_fragment: this.parseRoundFragment(data.story_fragment),
+    } as Round;
+  }
+
+  /**
+   * Update a round (Admin) by UUID or order_number
+   */
+  public async updateRound(identifier: string, dto: UpdateRoundDto): Promise<Round | null> {
+    let query = supabase.from('rounds').update(dto);
+
+    if (this.isUuid(identifier)) {
+      query = query.eq('id', identifier);
+    } else {
+      const orderNum = parseInt(identifier, 10);
+      if (isNaN(orderNum)) {
+        return null;
+      }
+      query = query.eq('order_number', orderNum);
+    }
+
+    const { data, error } = await query.select().maybeSingle();
+
+    if (error) {
+      throw new Error(`Failed to update round '${identifier}': ${error.message}`);
+    }
+
+    if (!data) return null;
+
+    return {
+      ...data,
+      story_fragment: this.parseRoundFragment(data.story_fragment),
+    } as Round;
+  }
+
+  /**
+   * Delete a round (Admin). Blocked while challenges are still assigned to it.
+   */
+  public async deleteRound(id: string): Promise<boolean> {
+    const { count, error: countError } = await supabase
+      .from('challenges')
+      .select('id', { count: 'exact', head: true })
+      .eq('round_id', id);
+
+    if (countError) {
+      throw new Error(`Failed to check round challenges: ${countError.message}`);
+    }
+
+    if (count && count > 0) {
+      throw new Error(`Cannot delete round with ${count} challenge(s) assigned. Move or delete its challenges first.`);
+    }
+
+    const { error } = await supabase
+      .from('rounds')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw new Error(`Failed to delete round: ${error.message}`);
+    }
+
+    return true;
+  }
+
+  /**
+   * Reorder rounds atomically via the reorder_rounds RPC
+   */
+  public async reorderRounds(orderedIds: string[]): Promise<Array<{ id: string; order_number: number }>> {
+    const { data, error } = await supabase.rpc('reorder_rounds', { p_ordered_ids: orderedIds });
+
+    if (error) {
+      throw new Error(`Failed to reorder rounds: ${error.message}`);
+    }
+
+    return (data || []) as Array<{ id: string; order_number: number }>;
   }
 }
 

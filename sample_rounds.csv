@@ -1,0 +1,3 @@
+name,order_number,story_fragment,is_active
+Round 1,1,"{""title"":""Recovered Mission Log"",""header"":""Day 102"",""content"":""Signal acquisition established. The relay has awakened - decrypt the handshake token to reclaim the uplink.""}",true
+Round 2,2,"{""title"":""Deep Space Relay"",""header"":""Day 103"",""content"":""The core reactor is cycling. Recover the boot sequence before the cooling system fails.""}",true

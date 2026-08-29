@@ -51,11 +51,11 @@ const editHintBodySchema = z.object({
 });
 
 const createChallengeSchema = z.object({
+  round_id: z.string().uuid('round_id must be a valid UUID').optional(),
   order_number: z.number().int().min(1),
   name: z.string().min(1),
   story_context: z.string().optional(),
   assets: z.array(assetSchema).optional(),
-  story_fragment: storyFragmentSchema.optional(),
   hints: z.array(hintSchema).optional(),
   answer_key: z.string().min(1, 'Answer key is required'),
   time_limit: z.number().int().min(1).optional(),
@@ -63,15 +63,33 @@ const createChallengeSchema = z.object({
 });
 
 const updateChallengeSchema = z.object({
+  round_id: z.string().uuid('round_id must be a valid UUID').optional(),
   order_number: z.number().int().min(1).optional(),
   name: z.string().min(1).optional(),
   story_context: z.string().optional(),
   assets: z.array(assetSchema).optional(),
-  story_fragment: storyFragmentSchema.optional(),
   hints: z.array(hintSchema).optional(),
   answer_key: z.string().min(1).optional(),
   time_limit: z.number().int().min(1).optional(),
   is_active: z.boolean().optional(),
+});
+
+const createRoundSchema = z.object({
+  name: z.string().min(1, 'Round name is required'),
+  order_number: z.number().int().min(1).optional(),
+  story_fragment: storyFragmentSchema.optional(),
+  is_active: z.boolean().optional(),
+});
+
+const updateRoundSchema = z.object({
+  name: z.string().min(1).optional(),
+  order_number: z.number().int().min(1).optional(),
+  story_fragment: storyFragmentSchema.optional(),
+  is_active: z.boolean().optional(),
+});
+
+const reorderRoundsSchema = z.object({
+  ordered_ids: z.array(z.string().uuid('Round ID must be a valid UUID')).min(1, 'ordered_ids must not be empty'),
 });
 
 const adminOverrideSchema = z.object({
@@ -628,6 +646,139 @@ export class AdminChallengeController {
       });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message || 'Failed to toggle IP blocking' });
+    }
+  }
+
+  /**
+   * GET /api/admin/rounds
+   * List all rounds (including inactive, with story fragments)
+   */
+  static async getRounds(req: Request, res: Response): Promise<void> {
+    try {
+      const data = await challengeService.getRoundsAdmin();
+      res.status(200).json({
+        success: true,
+        message: 'Rounds fetched successfully',
+        data,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message || 'Failed to fetch rounds' });
+    }
+  }
+
+  /**
+   * POST /api/admin/rounds
+   */
+  static async createRound(req: Request, res: Response): Promise<void> {
+    try {
+      const validatedData = createRoundSchema.parse(req.body);
+      const data = await challengeService.createRound(validatedData as any);
+      await logAdminActivity(req, 'CREATE_ROUND', { name: data.name, order_number: data.order_number });
+
+      res.status(201).json({
+        success: true,
+        message: `Round '${data.name}' created successfully`,
+        data,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ success: false, error: 'Validation Error', details: error.errors });
+        return;
+      }
+      res.status(500).json({ success: false, error: error.message || 'Failed to create round' });
+    }
+  }
+
+  /**
+   * PUT /api/admin/rounds/:id
+   */
+  static async updateRound(req: Request, res: Response): Promise<void> {
+    try {
+      const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      if (!rawId) {
+        res.status(400).json({ success: false, error: 'Round ID is required' });
+        return;
+      }
+      const id: string = rawId;
+      const validatedData = updateRoundSchema.parse(req.body);
+      const data = await challengeService.updateRound(id, validatedData as any);
+
+      if (!data) {
+        res.status(404).json({ success: false, error: `Round '${id}' not found` });
+        return;
+      }
+
+      await logAdminActivity(req, 'UPDATE_ROUND', { round_id: id, updates: validatedData });
+
+      res.status(200).json({
+        success: true,
+        message: `Round '${id}' updated successfully`,
+        data,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ success: false, error: 'Validation Error', details: error.errors });
+        return;
+      }
+      res.status(500).json({ success: false, error: error.message || 'Failed to update round' });
+    }
+  }
+
+  /**
+   * DELETE /api/admin/rounds/:id
+   */
+  static async deleteRound(req: Request, res: Response): Promise<void> {
+    try {
+      const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      if (!rawId) {
+        res.status(400).json({ success: false, error: 'Round ID is required' });
+        return;
+      }
+      const id: string = rawId;
+      const success = await challengeService.deleteRound(id);
+
+      if (!success) {
+        res.status(404).json({ success: false, error: `Round '${id}' not found` });
+        return;
+      }
+
+      await logAdminActivity(req, 'DELETE_ROUND', { round_id: id });
+
+      res.status(200).json({
+        success: true,
+        message: `Round '${id}' deleted successfully`,
+      });
+    } catch (error: any) {
+      if (error.message?.includes('Cannot delete round with')) {
+        res.status(400).json({ success: false, error: error.message });
+        return;
+      }
+      res.status(500).json({ success: false, error: error.message || 'Failed to delete round' });
+    }
+  }
+
+  /**
+   * POST /api/admin/rounds/reorder
+   * Reorder rounds via ordered UUID list
+   */
+  static async reorderRounds(req: Request, res: Response): Promise<void> {
+    try {
+      const validatedData = reorderRoundsSchema.parse(req.body);
+      const data = await challengeService.reorderRounds(validatedData.ordered_ids);
+
+      await logAdminActivity(req, 'REORDER_ROUNDS', { ordered_ids: validatedData.ordered_ids });
+
+      res.status(200).json({
+        success: true,
+        message: 'Rounds reordered successfully',
+        data,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ success: false, error: 'Validation Error', details: error.errors });
+        return;
+      }
+      res.status(500).json({ success: false, error: error.message || 'Failed to reorder rounds' });
     }
   }
 }
