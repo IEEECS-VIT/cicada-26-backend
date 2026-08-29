@@ -17,6 +17,13 @@ router.post('/override', AdminChallengeController.adminOverride);
 router.post('/reset-team', AdminChallengeController.resetTeamProgress);
 router.get('/submission-logs', AdminChallengeController.getSubmissionLogs);
 
+// Round Management routes
+router.get('/rounds', AdminChallengeController.getRounds);
+router.post('/rounds', AdminChallengeController.createRound);
+router.post('/rounds/reorder', AdminChallengeController.reorderRounds);
+router.put('/rounds/:id', AdminChallengeController.updateRound);
+router.delete('/rounds/:id', AdminChallengeController.deleteRound);
+
 // Hint Management routes pointing to the challenge
 router.post('/:id/hints', AdminChallengeController.addHint);
 router.put('/:id/hints/:hintId', AdminChallengeController.editHint);

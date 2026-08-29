@@ -47,6 +47,15 @@ This document provides a formal record of the features and enhancements that hav
 ### 1.7. Administrative Asset Management
 * **Asset Management for Admins**: Created specialized admin-only endpoints to add, delete, and replace assets in a challenge's JSONB array, generating unique UUIDs for assets and capturing admin logs.
 
+### 1.8. Round System & Story Fragments
+* **Rounds Table**: Added a `rounds` table (migration `00011_add_rounds.sql`) that groups challenges into themed stages via a `round_id` foreign key on `challenges` (with an automatic backfill into a default "Round 1").
+* **Fragment Relocation**: Moved story fragments from `challenges.story_fragment` to `rounds.story_fragment`. A challenge's fragment is now resolved from its round at the service layer, and only for rounds the team has entered.
+* **Fragment Unlock on Round Entry**: A round's intro fragment is served the moment the team enters the round — either embedded in the first unlocked challenge payload or returned on the submission response when the previous round's final challenge is solved.
+* **Round-Aware Progression**: Added `current_round_order` to participant progress and changed `unlocked_story_fragments` to return one fragment per entered round (`{ round_order, round_name, story_fragment }`).
+* **Round Masking**: Locked rounds are masked at the service boundary (only `id`, `name`, `order_number`, and `is_locked` are exposed; fragments are `null`).
+* **Admin Round Management**: Added CRUD endpoints (`GET/POST /api/admin/challenges/rounds`, `PUT/DELETE /api/admin/challenges/rounds/:id`) plus a `POST /api/admin/challenges/rounds/reorder` reordering RPC (`reorder_rounds`, mirroring the two-phase `reorder_challenges` pattern). Deleting a round with assigned challenges is rejected with a `400`.
+* **Security Fix**: Revoked the `authenticated` role's `EXECUTE` privilege on the `reorder_challenges` SECURITY DEFINER function (migration `00008`) to close a privilege escalation vector.
+
 ---
 
 ## 2. Yet to Be Implemented / Future Recommendations

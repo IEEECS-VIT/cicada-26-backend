@@ -15,6 +15,41 @@ export interface StoryFragment {
   content: string;
 }
 
+export interface Round {
+  id: string;
+  name: string;
+  order_number: number;
+  story_fragment?: StoryFragment | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RoundPublic {
+  id: string;
+  name: string;
+  order_number: number;
+  story_fragment?: StoryFragment | null;
+  is_active: boolean;
+  is_locked?: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateRoundDto {
+  name: string;
+  order_number?: number;
+  story_fragment?: StoryFragment;
+  is_active?: boolean;
+}
+
+export interface UpdateRoundDto {
+  name?: string;
+  order_number?: number;
+  story_fragment?: StoryFragment;
+  is_active?: boolean;
+}
+
 export interface ChallengeHint {
   id: string;
   text: string;
@@ -23,6 +58,9 @@ export interface ChallengeHint {
 
 export interface Challenge {
   id: string;
+  round_id?: string | null;
+  round_name?: string | null;
+  round_order?: number | null;
   order_number: number;
   name: string;
   story_context?: string | null;
@@ -38,6 +76,9 @@ export interface Challenge {
 
 export interface ChallengePublic {
   id: string;
+  round_id?: string | null;
+  round_name?: string | null;
+  round_order?: number | null;
   order_number: number;
   name: string;
   story_context?: string | null;
@@ -68,11 +109,12 @@ export interface TeamProgress {
 export interface ParticipantProgress {
   team_name: string;
   current_challenge_order: number;
+  current_round_order: number;
   completed_challenges: number[];
   challenges_solved: number;
   unlocked_story_fragments: Array<{
-    challenge_order: number;
-    challenge_name: string;
+    round_order: number;
+    round_name: string;
     story_fragment: StoryFragment;
   }>;
 }
@@ -110,6 +152,7 @@ export interface AdminOverrideDto {
 }
 
 export interface CreateChallengeDto {
+  round_id?: string;
   order_number: number;
   name: string;
   story_context?: string;
@@ -122,6 +165,7 @@ export interface CreateChallengeDto {
 }
 
 export interface UpdateChallengeDto {
+  round_id?: string;
   order_number?: number;
   name?: string;
   story_context?: string;

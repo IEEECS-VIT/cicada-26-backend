@@ -5,6 +5,9 @@ import {
   CreateChallengeDto,
   UpdateChallengeDto,
   ChallengeAsset,
+  Round,
+  CreateRoundDto,
+  UpdateRoundDto,
 } from '../../types/challenge.js';
 
 export interface IChallengeRepository {
@@ -28,4 +31,10 @@ export interface IChallengeRepository {
   addAssetToChallenge(challengeId: string, asset: Omit<ChallengeAsset, 'id'> & { id?: string }): Promise<ChallengeAsset[]>;
   editAssetInChallenge(challengeId: string, assetId: string, updatedAsset: Partial<ChallengeAsset>): Promise<ChallengeAsset[]>;
   deleteAssetFromChallenge(challengeId: string, assetId: string): Promise<ChallengeAsset[]>;
+  getRounds(): Promise<Round[]>;
+  getRoundByIdentifier(identifier: string | number): Promise<Round | null>;
+  createRound(dto: CreateRoundDto): Promise<Round>;
+  updateRound(identifier: string, dto: UpdateRoundDto): Promise<Round | null>;
+  deleteRound(id: string): Promise<boolean>;
+  reorderRounds(orderedIds: string[]): Promise<Array<{ id: string; order_number: number }>>;
 }

@@ -12,6 +12,7 @@ router.use(ipTrackingMiddleware);
 
 router.post('/submit', submissionRateLimiter, UserChallengeController.submitAnswer);
 router.get('/', UserChallengeController.getPublicChallenges);
+router.get('/rounds', UserChallengeController.getPublicRounds);
 router.get('/progress', UserChallengeController.getParticipantProgress);
 router.get('/story-fragments', UserChallengeController.getUnlockedStoryFragments);
 router.get('/assets/masked', UserChallengeController.viewMaskedAsset);

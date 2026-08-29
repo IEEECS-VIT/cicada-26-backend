@@ -17,6 +17,10 @@ import {
   TeamProgress,
   ChallengeHint,
   ChallengeAsset,
+  Round,
+  RoundPublic,
+  CreateRoundDto,
+  UpdateRoundDto,
 } from '../types/challenge.js';
 
 const isBcryptHash = (str: string): boolean => {
@@ -73,19 +77,75 @@ export class ChallengeService {
   }
 
   /**
+   * Resolve the Round a challenge belongs to (via its round_id)
+   */
+  private getRoundForChallenge(challenge: { round_id?: string | null }, rounds: Round[]): Round | null {
+    if (!challenge.round_id) return null;
+    return rounds.find((r) => r.id === challenge.round_id) || null;
+  }
+
+  /**
+   * Resolve the Round containing a given challenge order_number
+   */
+  private getRoundForOrder(order: number, challenges: ChallengePublic[], rounds: Round[]): Round | null {
+    const challenge = challenges.find((c) => c.order_number === order);
+    return challenge ? this.getRoundForChallenge(challenge, rounds) : null;
+  }
+
+  /**
+   * Determine the team's current round order. If progress points past the last
+   * challenge (competition finished), all rounds count as entered.
+   */
+  private getCurrentRoundOrder(currentOrder: number, challenges: ChallengePublic[], rounds: Round[]): number {
+    const round = this.getRoundForOrder(currentOrder, challenges, rounds);
+    if (round) return round.order_number;
+    const maxOrder = challenges.reduce((max, c) => Math.max(max, c.order_number), 0);
+    if (currentOrder > maxOrder && rounds.length > 0) {
+      return rounds[rounds.length - 1]!.order_number;
+    }
+    return 1;
+  }
+
+  /**
+   * Fetch a round's story fragment by round id
+   */
+  private async getRoundStoryFragment(roundId: string | null | undefined): Promise<StoryFragment | null> {
+    if (!roundId) return null;
+    const round = await this.challengeRepo.getRoundByIdentifier(roundId);
+    return round?.story_fragment || null;
+  }
+
+  /**
+   * When the next challenge is the first of a new round, return that round's
+   * intro fragment (the moment a team "enters" the round)
+   */
+  private async getRoundEntryFragment(nextChallengeOrder: number, currentRoundId?: string | null): Promise<StoryFragment | null> {
+    const nextChallenge = await this.challengeRepo.getPublicChallengeByIdentifier(nextChallengeOrder);
+    if (!nextChallenge || !nextChallenge.round_id) return null;
+    if (nextChallenge.round_id === currentRoundId) return null;
+    const nextRound = await this.challengeRepo.getRoundByIdentifier(nextChallenge.round_id);
+    return nextRound?.story_fragment || null;
+  }
+
+  /**
    * Get all active public challenges (without answer keys)
    * Optionally annotates is_locked status if team_name is provided
    */
   public async getPublicChallenges(team_name?: string, clientIp?: string): Promise<ChallengePublic[]> {
-    const challenges = await this.challengeRepo.getPublicChallenges();
+    const [challenges, rounds] = await Promise.all([
+      this.challengeRepo.getPublicChallenges(),
+      this.challengeRepo.getRounds(),
+    ]);
     let currentOrder = 1;
     let progress: any = null;
+    let currentRoundOrder = 1;
     if (team_name && team_name.trim()) {
       progress = await this.challengeRepo.getTeamProgress(team_name.trim());
       if (!progress) {
         progress = await this.challengeRepo.upsertTeamProgress(team_name.trim(), 1, []);
       }
       currentOrder = progress?.current_challenge_order || 1;
+      currentRoundOrder = this.getCurrentRoundOrder(currentOrder, challenges, rounds);
 
       // IP Tracking mismatch check
       if (isIpTrackingEnabled() && progress && progress.started_ip && clientIp && progress.started_ip !== clientIp) {
@@ -103,6 +163,9 @@ export class ChallengeService {
       if (isLocked) {
         return {
           id: item.id,
+          round_id: item.round_id,
+          round_name: item.round_name,
+          round_order: item.round_order,
           order_number: item.order_number,
           name: item.name,
           is_active: item.is_active,
@@ -119,11 +182,16 @@ export class ChallengeService {
         ? progress.challenge_started_at
         : undefined;
 
+      const round = this.getRoundForChallenge(item, rounds);
+      const roundFragment = round && round.order_number <= currentRoundOrder ? round.story_fragment : null;
+      const { story_fragment: _storyFragment, ...rest } = item as any;
+
       const publicChallenge = {
-        ...item,
+        ...rest,
         is_locked: false,
         time_limit: item.time_limit || 1800,
         hints: (item.hints || []).filter((h: any) => h.is_visible), // Service boundary visibility check (security filter)
+        story_fragment: roundFragment,
         challenge_started_at: toISTStringNullable(challenge_started_at) || null,
         created_at: toISTString(startVal || item.created_at, item.created_at),
         updated_at: toISTString(startVal || item.updated_at, item.updated_at)
@@ -160,6 +228,9 @@ export class ChallengeService {
     if (isLocked) {
       return {
         id: challenge.id,
+        round_id: challenge.round_id,
+        round_name: challenge.round_name,
+        round_order: challenge.round_order,
         order_number: challenge.order_number,
         name: challenge.name,
         is_active: challenge.is_active,
@@ -172,16 +243,23 @@ export class ChallengeService {
       } as unknown as ChallengePublic;
     }
 
+    const rounds = await this.challengeRepo.getRounds();
+    const currentRoundOrder = this.getCurrentRoundOrder(currentOrder, [challenge], rounds);
+    const round = this.getRoundForChallenge(challenge, rounds);
+    const roundFragment = round && round.order_number <= currentRoundOrder ? round.story_fragment : null;
+    const { story_fragment: _storyFragment, ...rest } = challenge as any;
+
     const challenge_started_at = challenge.order_number === currentOrder && progress ? progress.challenge_started_at : undefined;
     const startVal = (challenge.order_number === currentOrder && progress && progress.challenge_started_at && !isStartedAtPlaceholder(progress.challenge_started_at))
       ? progress.challenge_started_at
       : undefined;
 
     const publicChallenge = {
-      ...challenge,
+      ...rest,
       is_locked: false,
       time_limit: challenge.time_limit || 1800,
       hints: (challenge.hints || []).filter((h: any) => h.is_visible), // Service boundary visibility check (security filter)
+      story_fragment: roundFragment,
       challenge_started_at: toISTStringNullable(challenge_started_at) || null,
       created_at: toISTString(startVal || challenge.created_at, challenge.created_at),
       updated_at: toISTString(startVal || challenge.updated_at, challenge.updated_at)
@@ -243,11 +321,12 @@ export class ChallengeService {
     // Bug Fix: If they already solved this challenge, don't update Leaderboard time (which ruins their tie-breaker rank)
     const alreadyCompleted = existingProgress?.completed_challenges?.includes(challenge.order_number) || false;
     if (alreadyCompleted) {
+      const roundFragment = await this.getRoundStoryFragment(challenge.round_id);
       return {
         success: true,
         message: 'You have already completed this challenge.',
         unlocked_next_challenge: currentUnlockedOrder,
-        story_fragment: challenge.story_fragment || null,
+        story_fragment: roundFragment,
       };
     }
 
@@ -273,11 +352,14 @@ export class ChallengeService {
           existingProgress?.completed_challenges || []
         );
 
+        const roundFragment = await this.getRoundEntryFragment(nextChallengeOrder, challenge.round_id);
+
         return {
           success: false,
           message: 'Time Limit Exceeded. You have been moved to the next challenge without points.',
           tryAgain: false,
           unlocked_next_challenge: currentOrder,
+          story_fragment: roundFragment,
         };
       }
     }
@@ -340,11 +422,13 @@ export class ChallengeService {
       completedArray
     );
 
+    const roundFragment = await this.getRoundEntryFragment(nextChallengeOrder, challenge.round_id);
+
     return {
       success: true,
       message: 'Correct answer! Next challenge unlocked automatically.',
       unlocked_next_challenge: nextChallengeOrder,
-      story_fragment: challenge.story_fragment || null,
+      story_fragment: roundFragment,
     };
   }
 
@@ -358,19 +442,26 @@ export class ChallengeService {
 
     const progress = await this.challengeRepo.getTeamProgress(team_name.trim());
     const completedOrders = progress?.completed_challenges || [];
-    const allChallenges = await this.challengeRepo.getPublicChallenges();
+    const [allChallenges, rounds] = await Promise.all([
+      this.challengeRepo.getPublicChallenges(),
+      this.challengeRepo.getRounds(),
+    ]);
 
-    const unlockedFragments = allChallenges
-      .filter((c) => completedOrders.includes(c.order_number) && c.story_fragment !== undefined && c.story_fragment !== null)
-      .map((c) => ({
-        challenge_order: c.order_number,
-        challenge_name: c.name,
-        story_fragment: c.story_fragment as StoryFragment,
+    const currentOrder = progress?.current_challenge_order || 1;
+    const currentRoundOrder = this.getCurrentRoundOrder(currentOrder, allChallenges, rounds);
+
+    const unlockedFragments = rounds
+      .filter((r) => r.order_number <= currentRoundOrder && r.story_fragment)
+      .map((r) => ({
+        round_order: r.order_number,
+        round_name: r.name,
+        story_fragment: r.story_fragment as StoryFragment,
       }));
 
     return {
       team_name: team_name.trim(),
-      current_challenge_order: progress?.current_challenge_order || 1,
+      current_challenge_order: currentOrder,
+      current_round_order: currentRoundOrder,
       completed_challenges: completedOrders,
       challenges_solved: completedOrders.length,
       unlocked_story_fragments: unlockedFragments,
@@ -381,8 +472,8 @@ export class ChallengeService {
    * Story Fragment Archive: Get all unlocked story fragments for a team
    */
   public async getUnlockedStoryFragments(team_name: string): Promise<Array<{
-    challenge_order: number;
-    challenge_name: string;
+    round_order: number;
+    round_name: string;
     story_fragment: StoryFragment;
   }>> {
     const progress = await this.getParticipantProgress(team_name);
@@ -393,10 +484,14 @@ export class ChallengeService {
    * Admin Progress Tracking (Visible to Admin Only - Section 7)
    */
   public async getAllTeamsProgressAdmin(): Promise<AdminTeamProgressSummary[]> {
-    const progressList = await this.challengeRepo.getAllTeamsProgressAdmin();
-    const leaderboard = await this.leaderboardRepo.getLiveLeaderboard();
-    const allChallenges = await this.challengeRepo.getPublicChallenges();
+    const [progressList, leaderboard, allChallenges, rounds] = await Promise.all([
+      this.challengeRepo.getAllTeamsProgressAdmin(),
+      this.leaderboardRepo.getLiveLeaderboard(),
+      this.challengeRepo.getPublicChallenges(),
+      this.challengeRepo.getRounds(),
+    ]);
     const totalChallengesCount = allChallenges.length;
+    const totalRoundsCount = rounds.length;
 
     const summaryMap = new Map<string, AdminTeamProgressSummary>();
     const leaderboardMap = new Map(leaderboard.map((item) => [item.team_name, item]));
@@ -404,6 +499,8 @@ export class ChallengeService {
     for (const prog of progressList) {
       const lbEntry = leaderboardMap.get(prog.team_name);
       const solvedCount = prog.completed_challenges.length;
+      const roundOfTeam = this.getRoundForOrder(prog.current_challenge_order, allChallenges, rounds);
+      const roundsEntered = roundOfTeam?.order_number ?? 1;
 
       summaryMap.set(prog.team_name, {
         team_name: prog.team_name,
@@ -412,7 +509,7 @@ export class ChallengeService {
         completion_time: lbEntry?.completion_time || null,
         attempts_count: prog.attempts_count || 0,
         last_attempt_at: prog.last_attempt_at,
-        story_progress: `${solvedCount} / ${totalChallengesCount} fragments unlocked`,
+        story_progress: `${roundsEntered} / ${totalRoundsCount} rounds · ${solvedCount} / ${totalChallengesCount} challenges`,
         completed_challenges: prog.completed_challenges,
       });
     }
@@ -426,7 +523,7 @@ export class ChallengeService {
           completion_time: lb.completion_time || null,
           attempts_count: 0,
           last_attempt_at: lb.updated_at || lb.created_at || new Date().toISOString(),
-          story_progress: `${lb.challenges_completed || 0} / ${totalChallengesCount} fragments unlocked`,
+          story_progress: `1 / ${totalRoundsCount} rounds · ${lb.challenges_completed || 0} / ${totalChallengesCount} challenges`,
           completed_challenges: [],
         });
       }
@@ -472,10 +569,14 @@ export class ChallengeService {
       completedArray
     );
 
+    const targetChallenge = await this.challengeRepo.getPublicChallengeByIdentifier(target_challenge_order);
+    const targetFragment = targetChallenge ? await this.getRoundStoryFragment(targetChallenge.round_id) : null;
+
     return {
       success: true,
       message: `Admin override successful. Team '${team_name}' unlocked up to challenge ${target_challenge_order}.`,
       unlocked_next_challenge: target_challenge_order,
+      story_fragment: targetFragment,
     };
   }
 
@@ -603,6 +704,76 @@ export class ChallengeService {
    */
   public async toggleIpTracking(): Promise<boolean> {
     return toggleIpTracking();
+  }
+
+  /**
+   * Participant: List rounds with per-team lock state.
+   * A round's story fragment is only revealed once the team has ENTERED it
+   * (i.e. the round's first challenge is unlocked).
+   */
+  public async getPublicRounds(team_name?: string): Promise<RoundPublic[]> {
+    const [rounds, challenges] = await Promise.all([
+      this.challengeRepo.getRounds(),
+      this.challengeRepo.getPublicChallenges(),
+    ]);
+
+    let currentRoundOrder = 1;
+    if (team_name && team_name.trim()) {
+      const progress = await this.challengeRepo.getTeamProgress(team_name.trim());
+      const currentOrder = progress?.current_challenge_order || 1;
+      currentRoundOrder = this.getCurrentRoundOrder(currentOrder, challenges, rounds);
+    }
+
+    return rounds
+      .filter((r) => r.is_active)
+      .map((r) => {
+        const isLocked = r.order_number > currentRoundOrder;
+        return {
+          id: r.id,
+          name: r.name,
+          order_number: r.order_number,
+          story_fragment: isLocked ? null : r.story_fragment || null,
+          is_active: r.is_active,
+          is_locked: isLocked,
+          created_at: r.created_at,
+          updated_at: r.updated_at,
+        };
+      });
+  }
+
+  /**
+   * Admin: List all rounds (including inactive, with fragments)
+   */
+  public async getRoundsAdmin(): Promise<Round[]> {
+    return this.challengeRepo.getRounds();
+  }
+
+  /**
+   * Admin: Create a new round
+   */
+  public async createRound(dto: CreateRoundDto): Promise<Round> {
+    return this.challengeRepo.createRound(dto);
+  }
+
+  /**
+   * Admin: Update a round by UUID or order_number
+   */
+  public async updateRound(identifier: string, dto: UpdateRoundDto): Promise<Round | null> {
+    return this.challengeRepo.updateRound(identifier, dto);
+  }
+
+  /**
+   * Admin: Delete a round (blocked while challenges are assigned to it)
+   */
+  public async deleteRound(id: string): Promise<boolean> {
+    return this.challengeRepo.deleteRound(id);
+  }
+
+  /**
+   * Admin: Reorder rounds atomically
+   */
+  public async reorderRounds(orderedIds: string[]): Promise<Array<{ id: string; order_number: number }>> {
+    return this.challengeRepo.reorderRounds(orderedIds);
   }
 }
 
