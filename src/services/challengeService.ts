@@ -319,24 +319,17 @@ export class ChallengeService {
     }
 
     // Bug Fix: If they already solved this challenge, don't update Leaderboard time (which ruins their tie-breaker rank)
+    // NOTE: This is no longer a short-circuit — the answer is still validated below,
+    // so a wrong key (even for an already-solved challenge) still fails.
     const alreadyCompleted = existingProgress?.completed_challenges?.includes(challenge.order_number) || false;
-    if (alreadyCompleted) {
-      const roundFragment = await this.getRoundStoryFragment(challenge.round_id);
-      return {
-        success: true,
-        message: 'You have already completed this challenge.',
-        unlocked_next_challenge: currentUnlockedOrder,
-        story_fragment: roundFragment,
-      };
-    }
 
-    if (existingProgress && isStartedAtPlaceholder(existingProgress.challenge_started_at)) {
+    if (!alreadyCompleted && existingProgress && isStartedAtPlaceholder(existingProgress.challenge_started_at)) {
       const nowStr = new Date().toISOString();
       existingProgress = await this.challengeRepo.updateChallengeStartedAt(team_name.trim(), nowStr, clientIp);
     }
 
-    // Verify time limit/timeout
-    if (existingProgress && existingProgress.challenge_started_at && !isStartedAtPlaceholder(existingProgress.challenge_started_at)) {
+    // Verify time limit/timeout (only for the challenge the team is currently on)
+    if (!alreadyCompleted && existingProgress && existingProgress.challenge_started_at && !isStartedAtPlaceholder(existingProgress.challenge_started_at)) {
       const startedAt = new Date(existingProgress.challenge_started_at).getTime();
       const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
       const limit = challenge.time_limit !== undefined ? challenge.time_limit : 1800;
@@ -397,6 +390,19 @@ export class ChallengeService {
         success: false,
         message: 'Incorrect Authentication Key',
         tryAgain: true,
+      };
+    }
+
+    // Already solved (validated above): report completed state without
+    // advancing progress or touching the leaderboard (preserves tie-breaker rank).
+    if (alreadyCompleted) {
+      const roundFragment = await this.getRoundStoryFragment(challenge.round_id);
+      return {
+        success: true,
+        message: 'You have already completed this challenge.',
+        already_solved: true,
+        unlocked_next_challenge: currentUnlockedOrder,
+        story_fragment: roundFragment,
       };
     }
 

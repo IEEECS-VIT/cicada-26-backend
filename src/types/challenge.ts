@@ -144,6 +144,7 @@ export interface SubmitAnswerResult {
   tryAgain?: boolean;
   unlocked_next_challenge?: number | null;
   story_fragment?: StoryFragment | null;
+  already_solved?: boolean;
 }
 
 export interface AdminOverrideDto {
