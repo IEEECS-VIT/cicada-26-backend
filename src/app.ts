@@ -11,6 +11,7 @@ import userLeaderboardRoutes from './routes/user/leaderboardRoutes.js';
 import adminAuthRoutes from './routes/admin/authRoutes.js';
 import adminTeamRoutes from './routes/admin/teamRoutes.js';
 import adminChallengeRoutes from './routes/admin/challengeRoutes.js';
+import adminRoundRoutes from './routes/admin/roundRoutes.js';
 import adminLeaderboardRoutes from './routes/admin/leaderboardRoutes.js';
 
 // Super Admin (GOD) Routes
@@ -94,7 +95,8 @@ app.use('/api/leaderboard', userLeaderboardRoutes); // live leaderboard (require
 // ---------------------------------------------------------------------------
 app.use('/api/admin/auth', adminAuthRoutes);          // requireAdmin
 app.use('/api/admin/teams', adminTeamRoutes);          // requireAdmin
-app.use('/api/admin/challenges', adminChallengeRoutes);// requireAdmin
+app.use('/api/admin/challenges', adminChallengeRoutes);
+app.use('/api/admin/rounds', adminRoundRoutes);// requireAdmin
 app.use('/api/admin/leaderboard', adminLeaderboardRoutes); // requireAdmin
 
 // ---------------------------------------------------------------------------

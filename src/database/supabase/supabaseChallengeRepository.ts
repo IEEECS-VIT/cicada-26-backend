@@ -52,7 +52,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
   public async getPublicChallenges(): Promise<ChallengePublic[]> {
     const { data, error } = await supabase
       .from('challenges')
-      .select('id, order_number, name, story_context, assets, story_fragment, hints, time_limit, is_active, created_at, updated_at')
+      .select('id, order_number, name, story_context, assets, round_id, hints, time_limit, is_active, created_at, updated_at')
       .eq('is_active', true)
       .order('order_number', { ascending: true });
 
@@ -68,7 +68,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
       return {
         ...item,
         assets: typeof item.assets === 'string' ? JSON.parse(item.assets) : item.assets || [],
-        story_fragment: typeof item.story_fragment === 'string' ? JSON.parse(item.story_fragment) : item.story_fragment || null,
+        round_id: (typeof item !== "undefined" ? item.round_id : (typeof data !== "undefined" ? data.round_id : null)) || null,
         hints: visibleHints,
       };
     }) as ChallengePublic[];
@@ -80,7 +80,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
   public async getPublicChallengeByIdentifier(identifier: string | number): Promise<ChallengePublic | null> {
     let query = supabase
       .from('challenges')
-      .select('id, order_number, name, story_context, assets, story_fragment, hints, time_limit, is_active, created_at, updated_at')
+      .select('id, order_number, name, story_context, assets, round_id, hints, time_limit, is_active, created_at, updated_at')
       .eq('is_active', true);
 
     if (this.isUuid(identifier)) {
@@ -109,7 +109,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
     return {
       ...data,
       assets: typeof data.assets === 'string' ? JSON.parse(data.assets) : data.assets || [],
-      story_fragment: typeof data.story_fragment === 'string' ? JSON.parse(data.story_fragment) : data.story_fragment || null,
+      round_id: (typeof item !== "undefined" ? item.round_id : (typeof data !== "undefined" ? data.round_id : null)) || null,
       hints: visibleHints,
     } as ChallengePublic;
   }
@@ -141,7 +141,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
     return {
       ...data,
       assets: typeof data.assets === 'string' ? JSON.parse(data.assets) : data.assets || [],
-      story_fragment: typeof data.story_fragment === 'string' ? JSON.parse(data.story_fragment) : data.story_fragment || null,
+      round_id: (typeof item !== "undefined" ? item.round_id : (typeof data !== "undefined" ? data.round_id : null)) || null,
       hints: typeof data.hints === 'string' ? JSON.parse(data.hints) : data.hints || [],
     } as Challenge;
   }
@@ -162,7 +162,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
     return (data || []).map((item) => ({
       ...item,
       assets: typeof item.assets === 'string' ? JSON.parse(item.assets) : item.assets || [],
-      story_fragment: typeof item.story_fragment === 'string' ? JSON.parse(item.story_fragment) : item.story_fragment || null,
+      round_id: (typeof item !== "undefined" ? item.round_id : (typeof data !== "undefined" ? data.round_id : null)) || null,
       hints: typeof item.hints === 'string' ? JSON.parse(item.hints) : item.hints || [],
     })) as Challenge[];
   }
@@ -176,7 +176,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
       name: dto.name,
       story_context: dto.story_context || '',
       assets: dto.assets || [],
-      story_fragment: dto.story_fragment || {},
+      round_id: dto.round_id || null,
       hints: dto.hints || [],
       answer_key: dto.answer_key,
       time_limit: dto.time_limit !== undefined ? dto.time_limit : 1800,
@@ -196,7 +196,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
     return {
       ...data,
       assets: typeof data.assets === 'string' ? JSON.parse(data.assets) : data.assets || [],
-      story_fragment: typeof data.story_fragment === 'string' ? JSON.parse(data.story_fragment) : data.story_fragment || null,
+      round_id: (typeof item !== "undefined" ? item.round_id : (typeof data !== "undefined" ? data.round_id : null)) || null,
       hints: typeof data.hints === 'string' ? JSON.parse(data.hints) : data.hints || [],
     } as Challenge;
   }
@@ -228,7 +228,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
     return {
       ...data,
       assets: typeof data.assets === 'string' ? JSON.parse(data.assets) : data.assets || [],
-      story_fragment: typeof data.story_fragment === 'string' ? JSON.parse(data.story_fragment) : data.story_fragment || null,
+      round_id: (typeof item !== "undefined" ? item.round_id : (typeof data !== "undefined" ? data.round_id : null)) || null,
       hints: typeof data.hints === 'string' ? JSON.parse(data.hints) : data.hints || [],
     } as Challenge;
   }

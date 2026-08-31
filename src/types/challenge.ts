@@ -27,7 +27,7 @@ export interface Challenge {
   name: string;
   story_context?: string | null;
   assets: ChallengeAsset[];
-  story_fragment?: StoryFragment | null;
+  round_id: string;
   hints?: ChallengeHint[] | null;
   answer_key: string;
   time_limit?: number;
@@ -42,7 +42,7 @@ export interface ChallengePublic {
   name: string;
   story_context?: string | null;
   assets: ChallengeAsset[];
-  story_fragment?: StoryFragment | null;
+  round_id: string;
   hints?: ChallengeHint[] | null;
   is_active: boolean;
   is_locked?: boolean;
@@ -99,7 +99,7 @@ export interface SubmitAnswerResult {
   message: string;
   tryAgain?: boolean;
   unlocked_next_challenge?: number | null;
-  story_fragment?: StoryFragment | null;
+  round_id: string;
 }
 
 export interface AdminOverrideDto {
@@ -112,7 +112,7 @@ export interface CreateChallengeDto {
   name: string;
   story_context?: string;
   assets?: ChallengeAsset[];
-  story_fragment?: StoryFragment;
+  round_id?: string;
   hints?: ChallengeHint[];
   answer_key: string;
   time_limit?: number;
@@ -124,7 +124,7 @@ export interface UpdateChallengeDto {
   name?: string;
   story_context?: string;
   assets?: ChallengeAsset[];
-  story_fragment?: StoryFragment;
+  round_id?: string;
   hints?: ChallengeHint[];
   answer_key?: string;
   time_limit?: number;
