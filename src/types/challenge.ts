@@ -6,6 +6,7 @@ export interface ChallengeAsset {
   url?: string | undefined;
   name?: string | undefined;
   caption?: string | undefined;
+  asset_set?: number;\n  asset_set?: number;
   content?: string | undefined;
 }
 

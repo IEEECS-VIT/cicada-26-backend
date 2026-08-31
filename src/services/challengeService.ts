@@ -54,6 +54,37 @@ const toISTStringNullable = (dateStr: string | null | undefined): string | null 
 };
 
 export class ChallengeService {
+  public hashTeamId(str: string): number {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash);
+  }
+
+  public filterAssetsBySet(assets: any[] | undefined, assignedSet: number | null | undefined, teamIdHash: number): any[] {
+    if (!assets || assets.length === 0) return [];
+    
+    // Find all distinct sets in this challenge
+    const uniqueSets = Array.from(new Set(assets.map(a => a.asset_set).filter(s => typeof s === 'number'))).sort((a, b) => a - b);
+    
+    if (uniqueSets.length === 0) {
+      return assets; // No sets defined, return all
+    }
+
+    let targetSet;
+    if (assignedSet !== null && assignedSet !== undefined && uniqueSets.includes(assignedSet)) {
+       targetSet = assignedSet;
+    } else {
+       const setIndex = teamIdHash % uniqueSets.length;
+       targetSet = uniqueSets[setIndex];
+    }
+
+    return assets.filter(a => typeof a.asset_set !== 'number' || a.asset_set === targetSet);
+  }
+
   constructor(
     private challengeRepo: SupabaseChallengeRepository = supabaseChallengeRepository,
     private leaderboardRepo: SupabaseLeaderboardRepository = supabaseLeaderboardRepository
