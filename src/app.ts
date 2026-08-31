@@ -24,8 +24,8 @@ const app: Express = express();
 // CORS - allow all origins in development
 app.use(cors({
   origin: process.env.NODE_ENV === 'development' ? true : (origin, callback) => {
-    const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
-    if (!origin || origin === allowedOrigin) return callback(null, true);
+    const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',').map(o => o.trim());
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
     callback(new Error(`CORS: Origin '${origin}' is not allowed.`));
   },
   credentials: true, // Allow cookies (session_token HttpOnly cookie)
