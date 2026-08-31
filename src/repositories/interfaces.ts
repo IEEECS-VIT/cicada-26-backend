@@ -16,6 +16,7 @@ export interface Team {
   invite_code: string;
   is_disqualified: boolean;
   points?: number;
+  assigned_asset_set?: number | null;\n  assigned_asset_set?: number | null;
 }
 
 export interface Challenge {
