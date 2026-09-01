@@ -54,6 +54,22 @@ const toISTStringNullable = (dateStr: string | null | undefined): string | null 
 };
 
 export class ChallengeService {
+
+  private filterHints(hints: any[] | undefined | null, startedAtIso: string | null | undefined): any[] {
+    if (!hints || hints.length === 0) return [];
+    const startedTime = startedAtIso && !isStartedAtPlaceholder(startedAtIso) ? new Date(startedAtIso).getTime() : 0;
+    const elapsedMinutes = startedTime > 0 ? (Date.now() - startedTime) / 60000 : 0;
+
+    return hints.filter(h => {
+      if (h.is_visible) return true;
+      if (typeof h.unlock_minutes === 'number' && startedTime > 0) {
+        return elapsedMinutes >= h.unlock_minutes;
+      }
+      return false;
+    });
+  }
+
+
   public hashTeamId(str: string): number {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
@@ -185,7 +201,7 @@ export class ChallengeService {
 
       if (progress && isStartedAtPlaceholder(progress.challenge_started_at)) {
         const nowStr = new Date().toISOString();
-        progress = await this.challengeRepo.updateChallengeStartedAt(team_name.trim(), nowStr, clientIp);
+        progress = await this.challengeRepo.updateStartedTimers(team_name.trim(), nowStr, clientIp, !progress.round_started_at || isStartedAtPlaceholder(progress.round_started_at));
       }
     }
 
@@ -221,7 +237,7 @@ export class ChallengeService {
         ...rest,
         is_locked: false,
         time_limit: item.time_limit || 1800,
-        hints: (item.hints || []).filter((h: any) => h.is_visible), // Service boundary visibility check (security filter)
+        hints: this.filterHints(item.hints, item.order_number === currentOrder && progress ? progress.challenge_started_at : undefined), // Service boundary visibility check
         story_fragment: roundFragment,
         challenge_started_at: toISTStringNullable(challenge_started_at) || null,
         created_at: toISTString(startVal || item.created_at, item.created_at),
@@ -254,7 +270,7 @@ export class ChallengeService {
     const isLocked = challenge.order_number > currentOrder;
     if (!isLocked && team_name && team_name.trim() && progress && isStartedAtPlaceholder(progress.challenge_started_at) && challenge.order_number === currentOrder) {
       const nowStr = new Date().toISOString();
-      progress = await this.challengeRepo.updateChallengeStartedAt(team_name.trim(), nowStr, clientIp);
+      progress = await this.challengeRepo.updateStartedTimers(team_name.trim(), nowStr, clientIp, !progress.round_started_at || isStartedAtPlaceholder(progress.round_started_at));
     }
     if (isLocked) {
       return {
@@ -289,7 +305,7 @@ export class ChallengeService {
       ...rest,
       is_locked: false,
       time_limit: challenge.time_limit || 1800,
-      hints: (challenge.hints || []).filter((h: any) => h.is_visible), // Service boundary visibility check (security filter)
+      hints: this.filterHints(challenge.hints, challenge.order_number === currentOrder && progress ? progress.challenge_started_at : undefined), // Service boundary visibility check
       story_fragment: roundFragment,
       challenge_started_at: toISTStringNullable(challenge_started_at) || null,
       created_at: toISTString(startVal || challenge.created_at, challenge.created_at),
@@ -356,7 +372,7 @@ export class ChallengeService {
 
     if (!alreadyCompleted && existingProgress && isStartedAtPlaceholder(existingProgress.challenge_started_at)) {
       const nowStr = new Date().toISOString();
-      existingProgress = await this.challengeRepo.updateChallengeStartedAt(team_name.trim(), nowStr, clientIp);
+      existingProgress = await this.challengeRepo.updateStartedTimers(team_name.trim(), nowStr, clientIp, !existingProgress.round_started_at || isStartedAtPlaceholder(existingProgress.round_started_at));
     }
 
     // Verify time limit/timeout (only for the challenge the team is currently on)
@@ -676,21 +692,21 @@ export class ChallengeService {
   /**
    * Admin: Add a hint to a challenge
    */
-  public async addHintToChallenge(challengeId: string, hintText: string, isVisible: boolean): Promise<ChallengeHint[]> {
+  public async addHintToChallenge(challengeId: string, hintText: string, isVisible: boolean, unlockMinutes?: number): Promise<ChallengeHint[]> {
     if (!hintText || !hintText.trim()) {
       throw new Error('Hint text is required');
     }
-    return this.challengeRepo.addHintToChallenge(challengeId, hintText.trim(), isVisible);
+    return this.challengeRepo.addHintToChallenge(challengeId, hintText.trim(), isVisible, unlockMinutes);
   }
 
   /**
    * Admin: Edit a hint in a challenge
    */
-  public async editHintInChallenge(challengeId: string, hintId: string, hintText: string): Promise<ChallengeHint[]> {
+  public async editHintInChallenge(challengeId: string, hintId: string, hintText: string, unlockMinutes?: number): Promise<ChallengeHint[]> {
     if (!hintText || !hintText.trim()) {
       throw new Error('Hint text is required');
     }
-    return this.challengeRepo.editHintInChallenge(challengeId, hintId, hintText.trim());
+    return this.challengeRepo.editHintInChallenge(challengeId, hintId, hintText.trim(), unlockMinutes);
   }
 
   /**
@@ -776,6 +792,7 @@ export class ChallengeService {
           name: r.name,
           order_number: r.order_number,
           story_fragment: isLocked ? null : r.story_fragment || null,
+          time_limit: r.time_limit || 0,
           is_active: r.is_active,
           is_locked: isLocked,
           created_at: r.created_at,
