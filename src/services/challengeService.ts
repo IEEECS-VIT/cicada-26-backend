@@ -684,14 +684,14 @@ export class ChallengeService {
             const parsed = JSON.parse(trimmed);
             const hashedParsed: Record<string, string> = {};
             for (const key of Object.keys(parsed)) {
-              hashedParsed[key] = isBcryptHash(parsed[key]) ? parsed[key] : await bcrypt.hash(parsed[key].trim().toLowerCase(), 10);
+              hashedParsed[key] = isBcryptHash(parsed[key]) ? parsed[key] : parsed[key].trim().toLowerCase();
             }
             hashedDto.answer_key = JSON.stringify(hashedParsed);
           } catch (e) {
-            hashedDto.answer_key = await bcrypt.hash(trimmed.toLowerCase(), 10);
+            hashedDto.answer_key = trimmed.toLowerCase();
           }
         } else {
-          hashedDto.answer_key = await bcrypt.hash(trimmed.toLowerCase(), 10);
+          hashedDto.answer_key = trimmed.toLowerCase();
         }
       }
     return this.challengeRepo.createChallenge(hashedDto);
@@ -709,14 +709,14 @@ export class ChallengeService {
             const parsed = JSON.parse(trimmed);
             const hashedParsed: Record<string, string> = {};
             for (const key of Object.keys(parsed)) {
-              hashedParsed[key] = isBcryptHash(parsed[key]) ? parsed[key] : await bcrypt.hash(parsed[key].trim().toLowerCase(), 10);
+              hashedParsed[key] = isBcryptHash(parsed[key]) ? parsed[key] : parsed[key].trim().toLowerCase();
             }
             hashedDto.answer_key = JSON.stringify(hashedParsed);
           } catch (e) {
-            hashedDto.answer_key = await bcrypt.hash(trimmed.toLowerCase(), 10);
+            hashedDto.answer_key = trimmed.toLowerCase();
           }
         } else {
-          hashedDto.answer_key = await bcrypt.hash(trimmed.toLowerCase(), 10);
+          hashedDto.answer_key = trimmed.toLowerCase();
         }
       }
     return this.challengeRepo.updateChallenge(id, hashedDto);
