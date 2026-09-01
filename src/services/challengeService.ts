@@ -584,13 +584,19 @@ export class ChallengeService {
     }
 
     const existingProgress = await this.challengeRepo.getTeamProgress(team_name.trim());
-    const completedSet = new Set<number>(existingProgress?.completed_challenges || []);
 
-    for (let i = 1; i < target_challenge_order; i++) {
-      completedSet.add(i);
+    // If resetting to challenge 1 (full reset), wipe completed_challenges entirely.
+    // Otherwise, build up the set by marking all challenges before target as done.
+    let completedArray: number[];
+    if (target_challenge_order === 1) {
+      completedArray = [];
+    } else {
+      const completedSet = new Set<number>(existingProgress?.completed_challenges || []);
+      for (let i = 1; i < target_challenge_order; i++) {
+        completedSet.add(i);
+      }
+      completedArray = Array.from(completedSet).sort((a, b) => a - b);
     }
-
-    const completedArray = Array.from(completedSet).sort((a, b) => a - b);
 
     // 1. Update Leaderboard FIRST
     await this.leaderboardRepo.setScoreByName(
