@@ -321,7 +321,6 @@ export class UserChallengeController {
           message: result.message,
           unlocked_next_challenge: result.unlocked_next_challenge,
           story_fragment: result.story_fragment || null,
-          success_reward: result.success_reward || null,
           already_solved: !!result.already_solved,
           data: result,
         });

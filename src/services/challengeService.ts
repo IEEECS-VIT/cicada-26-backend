@@ -14,7 +14,6 @@ import {
   ParticipantProgress,
   AdminTeamProgressSummary,
   StoryFragment,
-  SuccessReward,
   TeamProgress,
   ChallengeHint,
   ChallengeAsset,
@@ -173,15 +172,6 @@ export class ChallengeService {
     if (nextChallenge.round_id === currentRoundId) return null;
     const nextRound = await this.challengeRepo.getRoundByIdentifier(nextChallenge.round_id);
     return nextRound?.story_fragment || null;
-  }
-
-  private normalizeSuccessReward(reward: SuccessReward | null | undefined): SuccessReward | null {
-    if (!reward || typeof reward !== 'object') return null;
-    const link = typeof reward.link === 'string' ? reward.link.trim() : null;
-    const label = typeof reward.label === 'string' ? reward.label.trim() : null;
-    const code = typeof reward.code === 'string' ? reward.code.trim() : null;
-    if (!link && !label && !code) return null;
-    return { ...(link ? { link } : {}), ...(label ? { label } : {}), ...(code ? { code } : {}) };
   }
 
   /**
@@ -486,7 +476,6 @@ export class ChallengeService {
         already_solved: true,
         unlocked_next_challenge: currentUnlockedOrder,
         story_fragment: roundFragment,
-        success_reward: this.normalizeSuccessReward(challenge.success_reward),
       };
     }
 
@@ -519,7 +508,6 @@ export class ChallengeService {
       message: 'Correct answer! Next challenge unlocked automatically.',
       unlocked_next_challenge: nextChallengeOrder,
       story_fragment: roundFragment,
-      success_reward: this.normalizeSuccessReward(challenge.success_reward),
     };
   }
 
@@ -706,7 +694,6 @@ export class ChallengeService {
           hashedDto.answer_key = trimmed.toLowerCase();
         }
       }
-    hashedDto.success_reward = this.normalizeSuccessReward(dto.success_reward);
     return this.challengeRepo.createChallenge(hashedDto);
   }
 
@@ -732,7 +719,6 @@ export class ChallengeService {
           hashedDto.answer_key = trimmed.toLowerCase();
         }
       }
-    hashedDto.success_reward = this.normalizeSuccessReward(dto.success_reward);
     return this.challengeRepo.updateChallenge(id, hashedDto);
   }
 

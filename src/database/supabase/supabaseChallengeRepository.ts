@@ -211,7 +211,6 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
       assets: dto.assets || [],
       hints: dto.hints || [],
       answer_key: dto.answer_key,
-      success_reward: dto.success_reward ?? null,
       time_limit: dto.time_limit !== undefined ? dto.time_limit : 1800,
       is_active: dto.is_active !== undefined ? dto.is_active : true,
     };

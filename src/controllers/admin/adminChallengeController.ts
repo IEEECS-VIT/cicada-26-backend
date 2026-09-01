@@ -62,14 +62,6 @@ const editHintBodySchema = z.object({
   unlock_minutes: z.number().int().min(0).optional(),
 });
 
-const successRewardSchema = z.object({
-  link: z.string().optional(),
-  label: z.string().optional(),
-  code: z.string().optional(),
-}).refine((v) => v.link !== undefined || v.label !== undefined || v.code !== undefined, {
-  message: 'Provide at least one of link, label, or code',
-}).optional().nullable();
-
 const createChallengeSchema = z.object({
   round_id: z.string().uuid('round_id must be a valid UUID').optional(),
   order_number: z.number().int().min(1),
@@ -79,7 +71,6 @@ const createChallengeSchema = z.object({
   story_fragment: storyFragmentSchema.optional(),
   hints: z.array(hintSchema).optional(),
   answer_key: z.string().min(1, 'Answer key is required'),
-  success_reward: successRewardSchema,
   time_limit: z.number().int().min(0).optional(), // 0 means unlimited
   is_active: z.boolean().optional(),
 });
@@ -93,7 +84,6 @@ const updateChallengeSchema = z.object({
   story_fragment: storyFragmentSchema.optional(),
   hints: z.array(hintSchema).optional(),
   answer_key: z.string().min(1).optional(),
-  success_reward: successRewardSchema,
   time_limit: z.number().int().min(0).optional(),
   is_active: z.boolean().optional(),
 });
