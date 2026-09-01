@@ -14,6 +14,12 @@ export interface StoryFragment {
   content: string;
 }
 
+export interface SuccessReward {
+  link?: string | null;
+  label?: string | null;
+  code?: string | null;
+}
+
 export interface Round {
   id: string;
   name: string;
@@ -72,6 +78,7 @@ export interface Challenge {
   story_fragment?: StoryFragment | null;
   hints?: ChallengeHint[] | null;
   answer_key: string;
+  success_reward?: SuccessReward | null;
   time_limit?: number;
   is_active: boolean;
   created_at: string;
@@ -89,6 +96,7 @@ export interface ChallengePublic {
   assets: ChallengeAsset[];
   story_fragment?: StoryFragment | null;
   hints?: ChallengeHint[] | null;
+  success_reward?: SuccessReward | null;
   is_active: boolean;
   is_locked?: boolean;
   time_limit?: number;
@@ -150,6 +158,7 @@ export interface SubmitAnswerResult {
   tryAgain?: boolean;
   unlocked_next_challenge?: number | null;
   story_fragment?: StoryFragment | null;
+  success_reward?: SuccessReward | null;
   already_solved?: boolean;
 }
 
@@ -167,6 +176,7 @@ export interface CreateChallengeDto {
   story_fragment?: StoryFragment;
   hints?: ChallengeHint[];
   answer_key: string;
+  success_reward?: SuccessReward | null;
   time_limit?: number;
   is_active?: boolean;
 }
@@ -180,6 +190,7 @@ export interface UpdateChallengeDto {
   story_fragment?: StoryFragment;
   hints?: ChallengeHint[];
   answer_key?: string;
+  success_reward?: SuccessReward | null;
   time_limit?: number;
   is_active?: boolean;
 }
