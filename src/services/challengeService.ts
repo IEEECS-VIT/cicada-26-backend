@@ -54,6 +54,22 @@ const toISTStringNullable = (dateStr: string | null | undefined): string | null 
 };
 
 export class ChallengeService {
+
+  private filterHints(hints: any[] | undefined | null, startedAtIso: string | null | undefined): any[] {
+    if (!hints || hints.length === 0) return [];
+    const startedTime = startedAtIso && !isStartedAtPlaceholder(startedAtIso) ? new Date(startedAtIso).getTime() : 0;
+    const elapsedMinutes = startedTime > 0 ? (Date.now() - startedTime) / 60000 : 0;
+
+    return hints.filter(h => {
+      if (h.is_visible) return true;
+      if (typeof h.unlock_minutes === 'number' && startedTime > 0) {
+        return elapsedMinutes >= h.unlock_minutes;
+      }
+      return false;
+    });
+  }
+
+
   public hashTeamId(str: string): number {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
@@ -185,7 +201,7 @@ export class ChallengeService {
 
       if (progress && isStartedAtPlaceholder(progress.challenge_started_at)) {
         const nowStr = new Date().toISOString();
-        progress = await this.challengeRepo.updateChallengeStartedAt(team_name.trim(), nowStr, clientIp);
+        progress = await this.challengeRepo.updateStartedTimers(team_name.trim(), nowStr, clientIp, !progress.round_started_at || isStartedAtPlaceholder(progress.round_started_at));
       }
     }
 
@@ -221,7 +237,7 @@ export class ChallengeService {
         ...rest,
         is_locked: false,
         time_limit: item.time_limit || 1800,
-        hints: (item.hints || []).filter((h: any) => h.is_visible), // Service boundary visibility check (security filter)
+        hints: this.filterHints(item.hints, item.order_number === currentOrder && progress ? progress.challenge_started_at : undefined), // Service boundary visibility check
         story_fragment: roundFragment,
         challenge_started_at: toISTStringNullable(challenge_started_at) || null,
         created_at: toISTString(startVal || item.created_at, item.created_at),
@@ -254,7 +270,7 @@ export class ChallengeService {
     const isLocked = challenge.order_number > currentOrder;
     if (!isLocked && team_name && team_name.trim() && progress && isStartedAtPlaceholder(progress.challenge_started_at) && challenge.order_number === currentOrder) {
       const nowStr = new Date().toISOString();
-      progress = await this.challengeRepo.updateChallengeStartedAt(team_name.trim(), nowStr, clientIp);
+      progress = await this.challengeRepo.updateStartedTimers(team_name.trim(), nowStr, clientIp, !progress.round_started_at || isStartedAtPlaceholder(progress.round_started_at));
     }
     if (isLocked) {
       return {
@@ -289,7 +305,7 @@ export class ChallengeService {
       ...rest,
       is_locked: false,
       time_limit: challenge.time_limit || 1800,
-      hints: (challenge.hints || []).filter((h: any) => h.is_visible), // Service boundary visibility check (security filter)
+      hints: this.filterHints(challenge.hints, challenge.order_number === currentOrder && progress ? progress.challenge_started_at : undefined), // Service boundary visibility check
       story_fragment: roundFragment,
       challenge_started_at: toISTStringNullable(challenge_started_at) || null,
       created_at: toISTString(startVal || challenge.created_at, challenge.created_at),
@@ -356,7 +372,7 @@ export class ChallengeService {
 
     if (!alreadyCompleted && existingProgress && isStartedAtPlaceholder(existingProgress.challenge_started_at)) {
       const nowStr = new Date().toISOString();
-      existingProgress = await this.challengeRepo.updateChallengeStartedAt(team_name.trim(), nowStr, clientIp);
+      existingProgress = await this.challengeRepo.updateStartedTimers(team_name.trim(), nowStr, clientIp, !existingProgress.round_started_at || isStartedAtPlaceholder(existingProgress.round_started_at));
     }
 
     // Verify time limit/timeout (only for the challenge the team is currently on)
@@ -399,13 +415,39 @@ export class ChallengeService {
 
     // Normalize comparison: trim leading/trailing spaces, case insensitive
     const normalizedSubmitted = answer.trim().toLowerCase();
-    let isCorrect = false;
+      let isCorrect = false;
+      let expectedHash = challenge.answer_key;
 
-    if (isBcryptHash(challenge.answer_key)) {
-      isCorrect = await bcrypt.compare(normalizedSubmitted, challenge.answer_key);
-    } else {
-      isCorrect = normalizedSubmitted === challenge.answer_key.trim().toLowerCase();
-    }
+      if (expectedHash.startsWith('{') && expectedHash.endsWith('}')) {
+         try {
+             const parsed = JSON.parse(expectedHash);
+             const teamData = await db.teams.findByName(team_name.trim());
+             const assignedSet = teamData?.assigned_asset_set;
+             
+             const uniqueSets = Array.from(new Set((challenge.assets || []).map((a: any) => a.asset_set).filter((s: any) => typeof s === 'number'))).sort((a: any, b: any) => a - b);
+             let targetSet = null;
+             
+             if (assignedSet !== null && assignedSet !== undefined && uniqueSets.includes(assignedSet)) {
+                 targetSet = assignedSet;
+             } else if (uniqueSets.length > 0) {
+                 targetSet = uniqueSets[this.hashTeamId(team_name.trim()) % uniqueSets.length];
+             }
+
+             if (targetSet !== null && parsed[String(targetSet)]) {
+                 expectedHash = parsed[String(targetSet)];
+             } else if (parsed['global']) {
+                 expectedHash = parsed['global'];
+             }
+         } catch (e) {
+             // Fallback to treat it as string if parsing fails
+         }
+      }
+  
+      if (isBcryptHash(expectedHash)) {
+        isCorrect = await bcrypt.compare(normalizedSubmitted, expectedHash);
+      } else {
+        isCorrect = normalizedSubmitted === expectedHash.trim().toLowerCase();
+      }
 
     // Log the submission attempt for admin visibility (submission_logs table)
     await db.submissionLogs.logSubmission(
@@ -584,13 +626,19 @@ export class ChallengeService {
     }
 
     const existingProgress = await this.challengeRepo.getTeamProgress(team_name.trim());
-    const completedSet = new Set<number>(existingProgress?.completed_challenges || []);
 
-    for (let i = 1; i < target_challenge_order; i++) {
-      completedSet.add(i);
+    // If resetting to challenge 1 (full reset), wipe completed_challenges entirely.
+    // Otherwise, build up the set by marking all challenges before target as done.
+    let completedArray: number[];
+    if (target_challenge_order === 1) {
+      completedArray = [];
+    } else {
+      const completedSet = new Set<number>(existingProgress?.completed_challenges || []);
+      for (let i = 1; i < target_challenge_order; i++) {
+        completedSet.add(i);
+      }
+      completedArray = Array.from(completedSet).sort((a, b) => a - b);
     }
-
-    const completedArray = Array.from(completedSet).sort((a, b) => a - b);
 
     // 1. Update Leaderboard FIRST
     await this.leaderboardRepo.setScoreByName(
@@ -630,8 +678,22 @@ export class ChallengeService {
   public async createChallenge(dto: CreateChallengeDto): Promise<Challenge> {
     const hashedDto = { ...dto };
     if (dto.answer_key) {
-      hashedDto.answer_key = await bcrypt.hash(dto.answer_key.trim().toLowerCase(), 10);
-    }
+        const trimmed = dto.answer_key.trim();
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            const hashedParsed: Record<string, string> = {};
+            for (const key of Object.keys(parsed)) {
+              hashedParsed[key] = isBcryptHash(parsed[key]) ? parsed[key] : await bcrypt.hash(parsed[key].trim().toLowerCase(), 10);
+            }
+            hashedDto.answer_key = JSON.stringify(hashedParsed);
+          } catch (e) {
+            hashedDto.answer_key = await bcrypt.hash(trimmed.toLowerCase(), 10);
+          }
+        } else {
+          hashedDto.answer_key = await bcrypt.hash(trimmed.toLowerCase(), 10);
+        }
+      }
     return this.challengeRepo.createChallenge(hashedDto);
   }
 
@@ -641,8 +703,22 @@ export class ChallengeService {
   public async updateChallenge(id: string, dto: UpdateChallengeDto): Promise<Challenge | null> {
     const hashedDto = { ...dto };
     if (dto.answer_key) {
-      hashedDto.answer_key = await bcrypt.hash(dto.answer_key.trim().toLowerCase(), 10);
-    }
+        const trimmed = dto.answer_key.trim();
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            const hashedParsed: Record<string, string> = {};
+            for (const key of Object.keys(parsed)) {
+              hashedParsed[key] = isBcryptHash(parsed[key]) ? parsed[key] : await bcrypt.hash(parsed[key].trim().toLowerCase(), 10);
+            }
+            hashedDto.answer_key = JSON.stringify(hashedParsed);
+          } catch (e) {
+            hashedDto.answer_key = await bcrypt.hash(trimmed.toLowerCase(), 10);
+          }
+        } else {
+          hashedDto.answer_key = await bcrypt.hash(trimmed.toLowerCase(), 10);
+        }
+      }
     return this.challengeRepo.updateChallenge(id, hashedDto);
   }
 
@@ -670,21 +746,21 @@ export class ChallengeService {
   /**
    * Admin: Add a hint to a challenge
    */
-  public async addHintToChallenge(challengeId: string, hintText: string, isVisible: boolean): Promise<ChallengeHint[]> {
+  public async addHintToChallenge(challengeId: string, hintText: string, isVisible: boolean, unlockMinutes?: number): Promise<ChallengeHint[]> {
     if (!hintText || !hintText.trim()) {
       throw new Error('Hint text is required');
     }
-    return this.challengeRepo.addHintToChallenge(challengeId, hintText.trim(), isVisible);
+    return this.challengeRepo.addHintToChallenge(challengeId, hintText.trim(), isVisible, unlockMinutes);
   }
 
   /**
    * Admin: Edit a hint in a challenge
    */
-  public async editHintInChallenge(challengeId: string, hintId: string, hintText: string): Promise<ChallengeHint[]> {
+  public async editHintInChallenge(challengeId: string, hintId: string, hintText: string, unlockMinutes?: number): Promise<ChallengeHint[]> {
     if (!hintText || !hintText.trim()) {
       throw new Error('Hint text is required');
     }
-    return this.challengeRepo.editHintInChallenge(challengeId, hintId, hintText.trim());
+    return this.challengeRepo.editHintInChallenge(challengeId, hintId, hintText.trim(), unlockMinutes);
   }
 
   /**
@@ -770,6 +846,7 @@ export class ChallengeService {
           name: r.name,
           order_number: r.order_number,
           story_fragment: isLocked ? null : r.story_fragment || null,
+          time_limit: r.time_limit || 0,
           is_active: r.is_active,
           is_locked: isLocked,
           created_at: r.created_at,
