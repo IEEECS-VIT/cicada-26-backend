@@ -524,10 +524,7 @@ export class ChallengeService {
     const nextChallengeOrder = challenge.order_number + 1;
     const currentOrder = Math.max(currentUnlockedOrder, nextChallengeOrder);
 
-    const allChallengesData = await this.challengeRepo.getAllChallengesAdmin();
-    const totalPoints = allChallengesData
-      .filter((c: any) => completedArray.includes(c.order_number))
-      .reduce((sum: number, c: any) => sum + (c.points || 0), 0);
+    const totalPoints = completedArray.length * 100;
 
     // 1. Update Leaderboard FIRST (ensures team exists in leaderboard table satisfying FK)
     await this.leaderboardRepo.setScoreByName(
