@@ -6,19 +6,21 @@ import { ChallengeAsset } from '../../types/challenge.js';
 
 const assetSchema = z.object({
   id: z.string().optional(),
-  type: z.enum(['image', 'pdf', 'audio', 'video', 'file', 'text']),
+  type: z.enum(['image', 'pdf', 'audio', 'video', 'file', 'text']).optional(),
   url: z.string().optional(),
   name: z.string().optional(),
   caption: z.string().optional(),
   content: z.string().optional(),
+  asset_set: z.number().optional(),
 });
 
 const addAssetBodySchema = z.object({
-  type: z.enum(['image', 'pdf', 'audio', 'video', 'file', 'text']),
+  type: z.enum(['image', 'pdf', 'audio', 'video', 'file', 'text']).optional(),
   url: z.string().optional(),
   name: z.string().optional(),
   caption: z.string().optional(),
   content: z.string().optional(),
+  asset_set: z.number().optional(),
 });
 
 const editAssetBodySchema = z.object({
@@ -27,6 +29,7 @@ const editAssetBodySchema = z.object({
   name: z.string().optional(),
   caption: z.string().optional(),
   content: z.string().optional(),
+  asset_set: z.number().optional(),
 });
 
 const storyFragmentSchema = z.object({
