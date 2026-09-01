@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { challengeService } from '../../services/challengeService.js';
 import db from '../../db.js';
+import { getRoundTimerConfig } from '../../services/roundTimerService.js';
 
 const getClientIp = (req: Request): string => {
   const forwarded = req.headers['x-forwarded-for'];
@@ -164,6 +165,25 @@ export class UserChallengeController {
       });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message || 'Failed to fetch participant progress' });
+    }
+  }
+
+  /**
+   * GET /api/challenges/round-timer
+   * Round countdown config. remaining_seconds is computed server-side from the
+   * persisted round_started_at + round_duration_seconds, so the participant
+   * timer never restarts on a page reload.
+   */
+  static async getRoundTimer(req: Request, res: Response): Promise<void> {
+    try {
+      const data = getRoundTimerConfig();
+      res.status(200).json({
+        success: true,
+        message: 'Round timer config fetched successfully',
+        data,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message || 'Failed to fetch round timer config' });
     }
   }
 

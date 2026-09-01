@@ -3,6 +3,12 @@ import { z } from 'zod';
 import { challengeService } from '../../services/challengeService.js';
 import { logAdminActivity } from '../../services/auditLogger.js';
 import { ChallengeAsset } from '../../types/challenge.js';
+import {
+  getRoundTimerConfig,
+  setRoundDurationSeconds,
+  startRound,
+  resetRoundTimer,
+} from '../../services/roundTimerService.js';
 
 const assetSchema = z.object({
   id: z.string().optional(),
@@ -105,6 +111,13 @@ const reorderRoundsSchema = z.object({
 const adminOverrideSchema = z.object({
   team_name: z.string().min(1, 'Team name is required'),
   target_challenge_order: z.number().int().min(1, 'Target challenge order must be at least 1'),
+});
+
+const updateRoundTimerSchema = z.object({
+  duration_seconds: z.number().int().min(60, 'Round duration must be at least 60 seconds').max(24 * 60 * 60 * 30).optional(),
+  action: z.enum(['start', 'reset']).optional(),
+}).refine((v) => v.duration_seconds !== undefined || v.action !== undefined, {
+  message: 'Provide duration_seconds and/or an action (start or reset)',
 });
 
 export class AdminChallengeController {
@@ -789,6 +802,62 @@ export class AdminChallengeController {
         return;
       }
       res.status(500).json({ success: false, error: error.message || 'Failed to reorder rounds' });
+    }
+  }
+
+  /**
+   * GET /api/admin/challenges/round-timer
+   * Get the current round timer config (duration, started_at, remaining).
+   */
+  static async getRoundTimer(req: Request, res: Response): Promise<void> {
+    try {
+      const data = getRoundTimerConfig();
+      res.status(200).json({
+        success: true,
+        message: 'Round timer config fetched successfully',
+        data,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message || 'Failed to fetch round timer config' });
+    }
+  }
+
+  /**
+   * POST /api/admin/challenges/round-timer
+   * Set the round duration and/or start/reset the countdown. Persisted to
+   * app_settings so the countdown survives page reloads and server restarts.
+   */
+  static async updateRoundTimer(req: Request, res: Response): Promise<void> {
+    try {
+      const validatedData = updateRoundTimerSchema.parse(req.body);
+      let data = getRoundTimerConfig();
+      const applied: string[] = [];
+
+      if (validatedData.duration_seconds !== undefined) {
+        data = await setRoundDurationSeconds(validatedData.duration_seconds);
+        applied.push(`duration=${validatedData.duration_seconds}s`);
+      }
+      if (validatedData.action === 'start') {
+        data = await startRound();
+        applied.push('started');
+      } else if (validatedData.action === 'reset') {
+        data = await resetRoundTimer();
+        applied.push('reset');
+      }
+
+      await logAdminActivity(req, 'UPDATE_ROUND_TIMER', { ...validatedData });
+
+      res.status(200).json({
+        success: true,
+        message: `Round timer updated (${applied.join(', ') || 'no changes'})`,
+        data,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ success: false, error: 'Validation Error', details: error.errors });
+        return;
+      }
+      res.status(500).json({ success: false, error: error.message || 'Failed to update round timer' });
     }
   }
 }
