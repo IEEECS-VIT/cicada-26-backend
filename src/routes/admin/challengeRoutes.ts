@@ -24,6 +24,10 @@ router.post('/rounds/reorder', AdminChallengeController.reorderRounds);
 router.put('/rounds/:id', AdminChallengeController.updateRound);
 router.delete('/rounds/:id', AdminChallengeController.deleteRound);
 
+// Round Timer routes (duration + start/reset, persisted to app_settings)
+router.get('/round-timer', AdminChallengeController.getRoundTimer);
+router.post('/round-timer', AdminChallengeController.updateRoundTimer);
+
 // Hint Management routes pointing to the challenge
 router.post('/:id/hints', AdminChallengeController.addHint);
 router.put('/:id/hints/:hintId', AdminChallengeController.editHint);
