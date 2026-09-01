@@ -706,11 +706,7 @@ export class ChallengeService {
           hashedDto.answer_key = trimmed.toLowerCase();
         }
       }
-        if (dto.success_reward !== undefined) {
-      hashedDto.success_reward = this.normalizeSuccessReward(dto.success_reward);
-    } else {
-      delete hashedDto.success_reward;
-    }
+    hashedDto.success_reward = this.normalizeSuccessReward(dto.success_reward);
     return this.challengeRepo.createChallenge(hashedDto);
   }
 
@@ -736,11 +732,7 @@ export class ChallengeService {
           hashedDto.answer_key = trimmed.toLowerCase();
         }
       }
-        if (dto.success_reward !== undefined) {
-      hashedDto.success_reward = this.normalizeSuccessReward(dto.success_reward);
-    } else {
-      delete hashedDto.success_reward;
-    }
+    hashedDto.success_reward = this.normalizeSuccessReward(dto.success_reward);
     return this.challengeRepo.updateChallenge(id, hashedDto);
   }
 
