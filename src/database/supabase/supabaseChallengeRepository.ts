@@ -348,29 +348,43 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
   }
 
   /**
-   * Update challenge_started_at for a team
+   * Update challenge_started_at and optionally round_started_at for a team
    */
-  public async updateChallengeStartedAt(team_name: string, started_at: string | null, clientIp?: string | null): Promise<TeamProgress> {
+  public async updateStartedTimers(team_name: string, started_at: string | null, clientIp?: string | null, setRoundStarted?: boolean): Promise<TeamProgress> {
+    const updatePayload: any = { 
+      challenge_started_at: started_at,
+      started_ip: clientIp || null
+    };
+
+    if (setRoundStarted) {
+      updatePayload.round_started_at = started_at;
+    }
+
     const { data, error } = await supabase
       .from('team_progress')
-      .update({ 
-        challenge_started_at: started_at,
-        started_ip: clientIp || null
-      })
+      .update(updatePayload)
       .eq('team_name', team_name)
       .select()
       .single();
 
     if (error) {
-      throw new Error(`Failed to update challenge started at for '${team_name}': ${error.message}`);
+      throw new Error(`Failed to update started timers for '${team_name}': ${error.message}`);
     }
 
     return {
-      ...data,
-      completed_challenges: typeof data.completed_challenges === 'string'
-        ? JSON.parse(data.completed_challenges)
-        : data.completed_challenges || [],
-    } as TeamProgress;
+      id: data.id,
+      team_name: data.team_name,
+      current_challenge_order: data.current_challenge_order,
+      completed_challenges: data.completed_challenges || [],
+      attempts_count: data.attempts_count,
+      last_attempt_at: data.last_attempt_at,
+      challenge_started_at: data.challenge_started_at,
+      started_ip: data.started_ip,
+      round_started_at: data.round_started_at,
+      round_bonus_seconds: data.round_bonus_seconds,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+    };
   }
 
   /**
@@ -380,7 +394,9 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
     team_name: string,
     current_challenge_order: number,
     completed_challenges: number[],
-    attempts_count?: number
+    attempts_count?: number,
+    round_started_at?: string | null,
+    round_bonus_seconds?: number
   ): Promise<TeamProgress> {
     // Ensure team exists in public.leaderboard table first (satisfies foreign key constraint)
     await this.ensureTeamInLeaderboard(team_name, completed_challenges.length);
@@ -392,15 +408,16 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
     const challenge_started_at = isNewChallenge ? '1970-01-01T00:00:00.000Z' : (existing?.challenge_started_at || '1970-01-01T00:00:00.000Z');
     const started_ip = isNewChallenge ? null : (existing?.started_ip || null);
 
-    const payload = {
+    const payload: any = {
       team_name,
       current_challenge_order,
       completed_challenges,
       attempts_count: attempts_count !== undefined ? attempts_count : (existing?.attempts_count || 0),
       last_attempt_at: now,
       challenge_started_at,
-      started_ip,
     };
+    if (round_started_at !== undefined) payload.round_started_at = round_started_at;
+    if (round_bonus_seconds !== undefined) payload.round_bonus_seconds = round_bonus_seconds;
 
     const { data, error } = await supabase
       .from('team_progress')
@@ -409,15 +426,23 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
       .single();
 
     if (error) {
-      throw new Error(`Failed to update team progress for '${team_name}': ${error.message}`);
+      throw new Error(`Failed to upsert team progress for '${team_name}': ${error.message}`);
     }
 
     return {
-      ...data,
-      completed_challenges: typeof data.completed_challenges === 'string'
-        ? JSON.parse(data.completed_challenges)
-        : data.completed_challenges || [],
-    } as TeamProgress;
+      id: data.id,
+      team_name: data.team_name,
+      current_challenge_order: data.current_challenge_order,
+      completed_challenges: data.completed_challenges || [],
+      attempts_count: data.attempts_count,
+      last_attempt_at: data.last_attempt_at,
+      challenge_started_at: data.challenge_started_at,
+      started_ip: data.started_ip,
+      round_started_at: data.round_started_at,
+      round_bonus_seconds: data.round_bonus_seconds,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+    };
   }
 
   /**
@@ -501,7 +526,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
   /**
    * Add a hint to a challenge
    */
-  public async addHintToChallenge(challengeId: string, hintText: string, isVisible: boolean): Promise<ChallengeHint[]> {
+  public async addHintToChallenge(challengeId: string, hintText: string, isVisible: boolean, unlockMinutes?: number): Promise<ChallengeHint[]> {
     const challenge = await this.getChallengeWithAnswerKey(challengeId);
     if (!challenge) {
       throw new Error(`Challenge '${challengeId}' not found`);
@@ -530,7 +555,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
   /**
    * Edit a hint in a challenge
    */
-  public async editHintInChallenge(challengeId: string, hintId: string, hintText: string): Promise<ChallengeHint[]> {
+  public async editHintInChallenge(challengeId: string, hintId: string, hintText: string, unlockMinutes?: number): Promise<ChallengeHint[]> {
     const challenge = await this.getChallengeWithAnswerKey(challengeId);
     if (!challenge) {
       throw new Error(`Challenge '${challengeId}' not found`);

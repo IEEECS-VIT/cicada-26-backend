@@ -26,7 +26,7 @@ export interface IChallengeRepository {
     attempts_count?: number
   ): Promise<TeamProgress>;
   recordAttempt(team_name: string): Promise<TeamProgress>;
-  updateChallengeStartedAt(team_name: string, started_at: string | null, clientIp?: string | null): Promise<TeamProgress>;
+  updateStartedTimers(team_name: string, started_at: string | null, clientIp?: string | null, setRoundStarted?: boolean): Promise<TeamProgress>;
   getAllTeamsProgressAdmin(): Promise<TeamProgress[]>;
   addAssetToChallenge(challengeId: string, asset: Omit<ChallengeAsset, 'id'> & { id?: string }): Promise<ChallengeAsset[]>;
   editAssetInChallenge(challengeId: string, assetId: string, updatedAsset: Partial<ChallengeAsset>): Promise<ChallengeAsset[]>;

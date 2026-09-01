@@ -101,7 +101,7 @@ export class AdminTeamController {
       return;
     }
     const team_id_or_name = String(rawId);
-    const { name, is_disqualified } = req.body;
+    const { name, is_disqualified, assigned_asset_set } = req.body;
 
     if (name === undefined && is_disqualified === undefined) {
       res.status(400).json({ success: false, error: 'At least one of name or is_disqualified is required.' });

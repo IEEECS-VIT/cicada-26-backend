@@ -12,27 +12,30 @@ import {
 
 const assetSchema = z.object({
   id: z.string().optional(),
-  type: z.enum(['image', 'pdf', 'audio', 'video', 'file', 'text']),
+  type: z.enum(['image', 'audio', 'video', 'document', 'link', 'pdf', 'file', 'text']).optional(),
   url: z.string().optional(),
   name: z.string().optional(),
   caption: z.string().optional(),
   content: z.string().optional(),
+  asset_set: z.number().optional(),
 });
 
 const addAssetBodySchema = z.object({
-  type: z.enum(['image', 'pdf', 'audio', 'video', 'file', 'text']),
+  type: z.enum(['image', 'audio', 'video', 'document', 'link', 'pdf', 'file', 'text']).optional(),
   url: z.string().optional(),
   name: z.string().optional(),
   caption: z.string().optional(),
   content: z.string().optional(),
+  asset_set: z.number().optional(),
 });
 
 const editAssetBodySchema = z.object({
-  type: z.enum(['image', 'pdf', 'audio', 'video', 'file', 'text']).optional(),
+  type: z.enum(['image', 'audio', 'video', 'document', 'link', 'pdf', 'file', 'text']).optional(),
   url: z.string().optional(),
   name: z.string().optional(),
   caption: z.string().optional(),
   content: z.string().optional(),
+  asset_set: z.number().optional(),
 });
 
 const storyFragmentSchema = z.object({
@@ -45,15 +48,18 @@ const hintSchema = z.object({
   id: z.string().optional(),
   text: z.string().min(1, 'Hint text cannot be empty'),
   is_visible: z.boolean().default(true),
+  unlock_minutes: z.number().int().min(0).optional(),
 });
 
 const addHintBodySchema = z.object({
   text: z.string().min(1, 'Hint text is required'),
   is_visible: z.boolean().default(true),
+  unlock_minutes: z.number().int().min(0).optional(),
 });
 
 const editHintBodySchema = z.object({
   text: z.string().min(1, 'Hint text is required'),
+  unlock_minutes: z.number().int().min(0).optional(),
 });
 
 const createChallengeSchema = z.object({
@@ -62,9 +68,10 @@ const createChallengeSchema = z.object({
   name: z.string().min(1),
   story_context: z.string().optional(),
   assets: z.array(assetSchema).optional(),
+  story_fragment: storyFragmentSchema.optional(),
   hints: z.array(hintSchema).optional(),
   answer_key: z.string().min(1, 'Answer key is required'),
-  time_limit: z.number().int().min(1).optional(),
+  time_limit: z.number().int().min(0).optional(), // 0 means unlimited
   is_active: z.boolean().optional(),
 });
 
@@ -74,9 +81,10 @@ const updateChallengeSchema = z.object({
   name: z.string().min(1).optional(),
   story_context: z.string().optional(),
   assets: z.array(assetSchema).optional(),
+  story_fragment: storyFragmentSchema.optional(),
   hints: z.array(hintSchema).optional(),
   answer_key: z.string().min(1).optional(),
-  time_limit: z.number().int().min(1).optional(),
+  time_limit: z.number().int().min(0).optional(),
   is_active: z.boolean().optional(),
 });
 
@@ -84,6 +92,7 @@ const createRoundSchema = z.object({
   name: z.string().min(1, 'Round name is required'),
   order_number: z.number().int().min(1).optional(),
   story_fragment: storyFragmentSchema.optional(),
+  time_limit: z.number().int().min(0).optional(),
   is_active: z.boolean().optional(),
 });
 
@@ -91,6 +100,7 @@ const updateRoundSchema = z.object({
   name: z.string().min(1).optional(),
   order_number: z.number().int().min(1).optional(),
   story_fragment: storyFragmentSchema.optional(),
+  time_limit: z.number().int().min(0).optional(),
   is_active: z.boolean().optional(),
 });
 
@@ -412,7 +422,7 @@ export class AdminChallengeController {
         return;
       }
       const validatedData = addHintBodySchema.parse(req.body);
-      const hints = await challengeService.addHintToChallenge(String(challengeId), validatedData.text, validatedData.is_visible);
+      const hints = await challengeService.addHintToChallenge(String(challengeId), validatedData.text, validatedData.is_visible, validatedData.unlock_minutes);
 
       await logAdminActivity(req, 'ADD_CHALLENGE_HINT', { challenge_id: String(challengeId), text: validatedData.text });
 
@@ -443,7 +453,7 @@ export class AdminChallengeController {
         return;
       }
       const validatedData = editHintBodySchema.parse(req.body);
-      const hints = await challengeService.editHintInChallenge(String(challengeId), String(hintId), validatedData.text);
+      const hints = await challengeService.editHintInChallenge(String(challengeId), String(hintId), validatedData.text, validatedData.unlock_minutes);
 
       await logAdminActivity(req, 'EDIT_CHALLENGE_HINT', { challenge_id: String(challengeId), hint_id: String(hintId) });
 
@@ -525,7 +535,7 @@ export class AdminChallengeController {
         return;
       }
       const validatedData = addAssetBodySchema.parse(req.body);
-      const assets = await challengeService.addAssetToChallenge(String(challengeId), validatedData);
+      const assets = await challengeService.addAssetToChallenge(String(challengeId), validatedData as any);
 
       await logAdminActivity(req, 'ADD_CHALLENGE_ASSET', { challenge_id: String(challengeId), type: validatedData.type, name: validatedData.name });
 

@@ -1,12 +1,11 @@
 export type AssetType = 'image' | 'pdf' | 'audio' | 'video' | 'file' | 'text';
 
 export interface ChallengeAsset {
-  id?: string | undefined;
-  type: AssetType;
-  url?: string | undefined;
-  name?: string | undefined;
-  caption?: string | undefined;
-  content?: string | undefined;
+  id: string;
+  type?: 'image' | 'audio' | 'video' | 'document' | 'link' | 'pdf' | 'file' | 'text';
+  name: string;
+  url: string;
+  asset_set?: number;
 }
 
 export interface StoryFragment {
@@ -20,6 +19,7 @@ export interface Round {
   name: string;
   order_number: number;
   story_fragment?: StoryFragment | null;
+  time_limit: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -30,6 +30,7 @@ export interface RoundPublic {
   name: string;
   order_number: number;
   story_fragment?: StoryFragment | null;
+  time_limit: number;
   is_active: boolean;
   is_locked?: boolean;
   created_at: string;
@@ -40,6 +41,7 @@ export interface CreateRoundDto {
   name: string;
   order_number?: number;
   story_fragment?: StoryFragment;
+  time_limit?: number;
   is_active?: boolean;
 }
 
@@ -47,6 +49,7 @@ export interface UpdateRoundDto {
   name?: string;
   order_number?: number;
   story_fragment?: StoryFragment;
+  time_limit?: number;
   is_active?: boolean;
 }
 
@@ -54,6 +57,7 @@ export interface ChallengeHint {
   id: string;
   text: string;
   is_visible: boolean;
+  unlock_minutes?: number;
 }
 
 export interface Challenge {
@@ -102,6 +106,8 @@ export interface TeamProgress {
   last_attempt_at: string;
   challenge_started_at: string | null;
   started_ip?: string | null;
+  round_started_at?: string | null;
+  round_bonus_seconds?: number;
   created_at: string;
   updated_at: string;
 }
