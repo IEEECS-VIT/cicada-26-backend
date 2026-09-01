@@ -74,6 +74,14 @@ export class SupabaseTeamRepository implements ITeamRepository {
     }
   }
 
+  async updateAssignedAssetSet(teamId: string, assignedSet: number): Promise<void> {
+    const { error } = await this.supabase
+      .from('teams')
+      .update({ assigned_asset_set: assignedSet })
+      .eq('id', teamId);
+    if (error) throw new Error(error.message);
+  }
+
   async updateName(teamId: string, newName: string): Promise<void> {
     const { error } = await this.supabase
       .from('teams')

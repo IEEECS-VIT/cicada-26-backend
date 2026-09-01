@@ -83,6 +83,7 @@ export interface ITeamRepository {
   countMembers(teamId: string): Promise<number>;
   createTeamAndJoin(userId: string, teamName: string, inviteCode: string, teamId: string): Promise<void>;
   updateName(teamId: string, newName: string): Promise<void>;
+  updateAssignedAssetSet(teamId: string, assignedSet: number): Promise<void>;
   removeMember(userId: string, teamId: string): Promise<void>;
   deleteTeam(teamId: string): Promise<void>;
 }

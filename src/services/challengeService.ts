@@ -108,11 +108,12 @@ export class ChallengeService {
 
   private maskChallengeAssets(challenge: ChallengePublic): ChallengePublic {
     if (!challenge.assets) return challenge;
-    const maskedAssets = challenge.assets.map((asset, index) => {
+    const maskedAssets = challenge.assets.map((asset: any, index: number) => {
       if (asset.url) {
+        const i = asset.original_index !== undefined ? asset.original_index : index;
         return {
           ...asset,
-          url: `/api/challenges/assets/masked?c=${challenge.id}&i=${index}`,
+          url: `/api/challenges/assets/masked?c=${challenge.id}&i=${i}`,
         };
       }
       return asset;
@@ -186,7 +187,27 @@ export class ChallengeService {
     let currentOrder = 1;
     let progress: any = null;
     let currentRoundOrder = 1;
+    let assignedSet: number | null = null;
+    let teamHash = 0;
+
     if (team_name && team_name.trim()) {
+      teamHash = this.hashTeamId(team_name.trim());
+      const teamData = await db.teams.findByName(team_name.trim());
+      if (teamData) {
+        assignedSet = teamData.assigned_asset_set ?? null;
+        // Auto-assign and save a permanent asset set if none exists
+        if (assignedSet === null || assignedSet === undefined) {
+          const firstWithSets = challenges.find(c => c.assets && c.assets.some(a => typeof a.asset_set === 'number'));
+          if (firstWithSets) {
+            const uniqueSets = Array.from(new Set(firstWithSets.assets.map((a: any) => a.asset_set).filter((s: any) => typeof s === 'number'))).sort((a: any, b: any) => a - b);
+            if (uniqueSets.length > 0) {
+              assignedSet = Number(uniqueSets[teamHash % uniqueSets.length]);
+              await db.teams.updateAssignedAssetSet(teamData.id, assignedSet as number);
+            }
+          }
+        }
+      }
+
       progress = await this.challengeRepo.getTeamProgress(team_name.trim());
       if (!progress) {
         progress = await this.challengeRepo.upsertTeamProgress(team_name.trim(), 1, []);
@@ -233,8 +254,16 @@ export class ChallengeService {
       const roundFragment = round && round.order_number <= currentRoundOrder ? round.story_fragment : null;
       const { story_fragment: _storyFragment, ...rest } = item as any;
 
+      // Attach original index and filter assets
+      let finalAssets = rest.assets || [];
+      if (team_name && team_name.trim()) {
+        finalAssets = finalAssets.map((a: any, i: number) => ({ ...a, original_index: i }));
+        finalAssets = this.filterAssetsBySet(finalAssets, assignedSet, teamHash);
+      }
+
       const publicChallenge = {
         ...rest,
+        assets: finalAssets,
         is_locked: false,
         time_limit: item.time_limit || 1800,
         hints: this.filterHints(item.hints, item.order_number === currentOrder && progress ? progress.challenge_started_at : undefined), // Service boundary visibility check
@@ -254,7 +283,15 @@ export class ChallengeService {
 
     let currentOrder = 1;
     let progress: any = null;
+    let assignedSet: number | null = null;
+    let teamHash = 0;
+
     if (team_name && team_name.trim()) {
+      teamHash = this.hashTeamId(team_name.trim());
+      const teamData = await db.teams.findByName(team_name.trim());
+      if (teamData) {
+        assignedSet = teamData.assigned_asset_set ?? null;
+      }
       progress = await this.challengeRepo.getTeamProgress(team_name.trim());
       if (!progress) {
         progress = await this.challengeRepo.upsertTeamProgress(team_name.trim(), 1, []);
