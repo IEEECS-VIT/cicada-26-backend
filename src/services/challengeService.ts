@@ -684,7 +684,7 @@ export class ChallengeService {
             const parsed = JSON.parse(trimmed);
             const hashedParsed: Record<string, string> = {};
             for (const key of Object.keys(parsed)) {
-              hashedParsed[key] = await bcrypt.hash(parsed[key].trim().toLowerCase(), 10);
+              hashedParsed[key] = isBcryptHash(parsed[key]) ? parsed[key] : await bcrypt.hash(parsed[key].trim().toLowerCase(), 10);
             }
             hashedDto.answer_key = JSON.stringify(hashedParsed);
           } catch (e) {
@@ -709,7 +709,7 @@ export class ChallengeService {
             const parsed = JSON.parse(trimmed);
             const hashedParsed: Record<string, string> = {};
             for (const key of Object.keys(parsed)) {
-              hashedParsed[key] = await bcrypt.hash(parsed[key].trim().toLowerCase(), 10);
+              hashedParsed[key] = isBcryptHash(parsed[key]) ? parsed[key] : await bcrypt.hash(parsed[key].trim().toLowerCase(), 10);
             }
             hashedDto.answer_key = JSON.stringify(hashedParsed);
           } catch (e) {
