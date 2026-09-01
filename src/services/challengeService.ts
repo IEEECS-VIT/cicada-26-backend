@@ -415,13 +415,39 @@ export class ChallengeService {
 
     // Normalize comparison: trim leading/trailing spaces, case insensitive
     const normalizedSubmitted = answer.trim().toLowerCase();
-    let isCorrect = false;
+      let isCorrect = false;
+      let expectedHash = challenge.answer_key;
 
-    if (isBcryptHash(challenge.answer_key)) {
-      isCorrect = await bcrypt.compare(normalizedSubmitted, challenge.answer_key);
-    } else {
-      isCorrect = normalizedSubmitted === challenge.answer_key.trim().toLowerCase();
-    }
+      if (expectedHash.startsWith('{') && expectedHash.endsWith('}')) {
+         try {
+             const parsed = JSON.parse(expectedHash);
+             const teamData = await db.teams.findByName(team_name.trim());
+             const assignedSet = teamData?.assigned_asset_set;
+             
+             const uniqueSets = Array.from(new Set((challenge.assets || []).map((a: any) => a.asset_set).filter((s: any) => typeof s === 'number'))).sort((a: any, b: any) => a - b);
+             let targetSet = null;
+             
+             if (assignedSet !== null && assignedSet !== undefined && uniqueSets.includes(assignedSet)) {
+                 targetSet = assignedSet;
+             } else if (uniqueSets.length > 0) {
+                 targetSet = uniqueSets[this.hashTeamId(team_name.trim()) % uniqueSets.length];
+             }
+
+             if (targetSet !== null && parsed[String(targetSet)]) {
+                 expectedHash = parsed[String(targetSet)];
+             } else if (parsed['global']) {
+                 expectedHash = parsed['global'];
+             }
+         } catch (e) {
+             // Fallback to treat it as string if parsing fails
+         }
+      }
+  
+      if (isBcryptHash(expectedHash)) {
+        isCorrect = await bcrypt.compare(normalizedSubmitted, expectedHash);
+      } else {
+        isCorrect = normalizedSubmitted === expectedHash.trim().toLowerCase();
+      }
 
     // Log the submission attempt for admin visibility (submission_logs table)
     await db.submissionLogs.logSubmission(
@@ -652,8 +678,22 @@ export class ChallengeService {
   public async createChallenge(dto: CreateChallengeDto): Promise<Challenge> {
     const hashedDto = { ...dto };
     if (dto.answer_key) {
-      hashedDto.answer_key = await bcrypt.hash(dto.answer_key.trim().toLowerCase(), 10);
-    }
+        const trimmed = dto.answer_key.trim();
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            const hashedParsed: Record<string, string> = {};
+            for (const key of Object.keys(parsed)) {
+              hashedParsed[key] = await bcrypt.hash(parsed[key].trim().toLowerCase(), 10);
+            }
+            hashedDto.answer_key = JSON.stringify(hashedParsed);
+          } catch (e) {
+            hashedDto.answer_key = await bcrypt.hash(trimmed.toLowerCase(), 10);
+          }
+        } else {
+          hashedDto.answer_key = await bcrypt.hash(trimmed.toLowerCase(), 10);
+        }
+      }
     return this.challengeRepo.createChallenge(hashedDto);
   }
 
@@ -663,8 +703,22 @@ export class ChallengeService {
   public async updateChallenge(id: string, dto: UpdateChallengeDto): Promise<Challenge | null> {
     const hashedDto = { ...dto };
     if (dto.answer_key) {
-      hashedDto.answer_key = await bcrypt.hash(dto.answer_key.trim().toLowerCase(), 10);
-    }
+        const trimmed = dto.answer_key.trim();
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            const hashedParsed: Record<string, string> = {};
+            for (const key of Object.keys(parsed)) {
+              hashedParsed[key] = await bcrypt.hash(parsed[key].trim().toLowerCase(), 10);
+            }
+            hashedDto.answer_key = JSON.stringify(hashedParsed);
+          } catch (e) {
+            hashedDto.answer_key = await bcrypt.hash(trimmed.toLowerCase(), 10);
+          }
+        } else {
+          hashedDto.answer_key = await bcrypt.hash(trimmed.toLowerCase(), 10);
+        }
+      }
     return this.challengeRepo.updateChallenge(id, hashedDto);
   }
 
