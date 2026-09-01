@@ -524,10 +524,15 @@ export class ChallengeService {
     const nextChallengeOrder = challenge.order_number + 1;
     const currentOrder = Math.max(currentUnlockedOrder, nextChallengeOrder);
 
+    const allChallengesData = await this.challengeRepo.getAllChallengesAdmin();
+    const totalPoints = allChallengesData
+      .filter((c: any) => completedArray.includes(c.order_number))
+      .reduce((sum: number, c: any) => sum + (c.points || 0), 0);
+
     // 1. Update Leaderboard FIRST (ensures team exists in leaderboard table satisfying FK)
     await this.leaderboardRepo.setScoreByName(
       team_name.trim(),
-      completedArray.length,
+      totalPoints,
       new Date().toISOString()
     );
 
@@ -621,6 +626,7 @@ export class ChallengeService {
       summaryMap.set(prog.team_name, {
         team_name: prog.team_name,
         current_challenge_order: prog.current_challenge_order,
+          current_round_order: roundsEntered,
         challenges_solved: solvedCount,
         completion_time: lbEntry?.completion_time || null,
         attempts_count: prog.attempts_count || 0,
@@ -641,6 +647,7 @@ export class ChallengeService {
           last_attempt_at: lb.updated_at || lb.created_at || new Date().toISOString(),
           story_progress: `1 / ${totalRoundsCount} rounds · ${lb.challenges_completed || 0} / ${totalChallengesCount} challenges`,
           completed_challenges: [],
+          current_round_order: 1,
         });
       }
     }

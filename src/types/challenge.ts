@@ -126,6 +126,7 @@ export interface ParticipantProgress {
 }
 
 export interface AdminTeamProgressSummary {
+  current_round_order: number;
   team_name: string;
   current_challenge_order: number;
   challenges_solved: number;

@@ -67,7 +67,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
   public async getPublicChallenges(): Promise<ChallengePublic[]> {
     const { data, error } = await supabase
       .from('challenges')
-      .select('id, round_id, order_number, name, story_context, assets, hints, time_limit, is_active, created_at, updated_at, rounds(id, name, order_number)')
+      .select('id, round_id, order_number, name, story_context, assets, hints, time_limit, points, is_active, created_at, updated_at, rounds(id, name, order_number)')
       .eq('is_active', true)
       .order('order_number', { ascending: true });
 
@@ -96,7 +96,7 @@ export class SupabaseChallengeRepository implements IChallengeRepository {
   public async getPublicChallengeByIdentifier(identifier: string | number): Promise<ChallengePublic | null> {
     let query = supabase
       .from('challenges')
-      .select('id, round_id, order_number, name, story_context, assets, hints, time_limit, is_active, created_at, updated_at, rounds(id, name, order_number)')
+      .select('id, round_id, order_number, name, story_context, assets, hints, time_limit, points, is_active, created_at, updated_at, rounds(id, name, order_number)')
       .eq('is_active', true);
 
     if (this.isUuid(identifier)) {
