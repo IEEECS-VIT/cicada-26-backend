@@ -360,6 +360,14 @@ export class ChallengeService {
    * 4. On correct answer -> Update Leaderboard FIRST, then unlock next challenge & team progress
    * 5. On incorrect answer -> Return "Incorrect Authentication Key" (No info leakage)
    */
+  
+  private async getTrueNextOrder(currentOrder: number): Promise<number> {
+    const all = await this.challengeRepo.getAllChallengesAdmin();
+    const sorted = all.sort((a, b) => a.order_number - b.order_number);
+    const next = sorted.find(c => c.order_number > currentOrder);
+    return next ? next.order_number : currentOrder + 1;
+  }
+
   public async submitAnswer(dto: SubmitAnswerDto, clientIp?: string): Promise<SubmitAnswerResult> {
     const { team_name, challenge_identifier, answer } = dto;
 
@@ -420,7 +428,7 @@ export class ChallengeService {
       if (elapsedSeconds > limit) {
         // TIME LIMIT EXCEEDED: Auto-skip to next challenge without awarding points
         // This prevents the team from being permanently soft-locked forever.
-        const nextChallengeOrder = challenge.order_number + 1;
+        const nextChallengeOrder = await this.getTrueNextOrder(challenge.order_number);
         const currentOrder = Math.max(currentUnlockedOrder, nextChallengeOrder);
         
         await this.challengeRepo.upsertTeamProgress(
@@ -521,7 +529,7 @@ export class ChallengeService {
     completedSet.add(challenge.order_number);
 
     const completedArray = Array.from(completedSet).sort((a, b) => a - b);
-    const nextChallengeOrder = challenge.order_number + 1;
+    const nextChallengeOrder = await this.getTrueNextOrder(challenge.order_number);
     const currentOrder = Math.max(currentUnlockedOrder, nextChallengeOrder);
 
     const totalPoints = completedArray.length * 100;
