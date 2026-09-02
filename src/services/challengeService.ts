@@ -425,6 +425,14 @@ export class ChallengeService {
       };
     }
 
+    if (currentRoundCheck && currentRoundCheck.started_at === null && currentRoundCheck.order_number === 1) {
+      return {
+        success: false,
+        message: 'Round not started yet.',
+        tryAgain: false,
+      };
+    }
+
     // Bug Fix: If they already solved this challenge, don't update Leaderboard time (which ruins their tie-breaker rank)
     // NOTE: This is no longer a short-circuit — the answer is still validated below,
     // so a wrong key (even for an already-solved challenge) still fails.
