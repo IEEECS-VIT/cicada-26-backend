@@ -789,8 +789,7 @@ export class ChallengeService {
     for (const prog of progressList) {
       const lbEntry = leaderboardMap.get(prog.team_name);
       const solvedCount = prog.completed_challenges.length;
-      const roundOfTeam = this.getRoundForOrder(prog.current_challenge_order, allChallenges, rounds);
-      const roundsEntered = roundOfTeam?.order_number ?? 1;
+      const roundsEntered = this.getCurrentRoundOrder(prog.current_challenge_order, allChallenges, rounds);
 
       summaryMap.set(prog.team_name, {
         team_name: prog.team_name,
