@@ -86,7 +86,7 @@ export class UserAuthController {
       res.cookie('session_token', sessionToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
         maxAge: SESSION_TTL_MS,
         path: '/',
       });
