@@ -409,18 +409,20 @@ export class UserChallengeController {
         return;
       }
 
-      let assetResponse: globalThis.Response;
+            let assetResponse: globalThis.Response;
       try {
+        const headers: any = {};
+        if (req.headers.range) {
+          headers['range'] = req.headers.range;
+        }
+        
         assetResponse = await fetch(assetUrl.toString(), {
           redirect: 'manual',
-          signal: AbortSignal.timeout(ASSET_FETCH_TIMEOUT_MS),
+          headers,
+          // signal: AbortSignal.timeout(ASSET_FETCH_TIMEOUT_MS), // Removed timeout for streaming large assets
         });
       } catch (err: any) {
-        if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
-          res.status(504).json({ success: false, error: 'Asset fetch timed out' });
-        } else {
-          res.status(502).json({ success: false, error: 'Failed to retrieve asset from origin storage' });
-        }
+        res.status(502).json({ success: false, error: 'Failed to retrieve asset from origin storage' });
         return;
       }
 
@@ -429,30 +431,26 @@ export class UserChallengeController {
         return;
       }
 
-      if (!assetResponse.ok) {
+      if (!assetResponse.ok && assetResponse.status !== 206) {
         res.status(404).json({ success: false, error: 'Failed to retrieve asset from origin storage' });
         return;
       }
 
-      const contentLength = assetResponse.headers.get('content-length');
-      if (contentLength) {
-        const size = parseInt(contentLength, 10);
-        if (!isNaN(size) && size > MAX_ASSET_BYTES) {
-          res.status(413).json({ success: false, error: 'Asset is too large' });
-          return;
-        }
+      res.status(assetResponse.status);
+      
+      const headersToProxy = ['content-type', 'content-length', 'content-range', 'accept-ranges', 'cache-control'];
+      headersToProxy.forEach((h) => {
+        const val = assetResponse.headers.get(h);
+        if (val) res.setHeader(h, val);
+      });
+
+      if (assetResponse.body) {
+        const { Readable } = require('stream');
+        Readable.fromWeb(assetResponse.body as any).pipe(res);
+      } else {
+        const arrayBuffer = await assetResponse.arrayBuffer();
+        res.send(Buffer.from(arrayBuffer));
       }
-
-      const arrayBuffer = await assetResponse.arrayBuffer();
-      if (arrayBuffer.byteLength > MAX_ASSET_BYTES) {
-        res.status(413).json({ success: false, error: 'Asset is too large' });
-        return;
-      }
-
-      const contentType = assetResponse.headers.get('content-type') || 'application/octet-stream';
-      res.setHeader('Content-Type', contentType);
-
-      res.send(Buffer.from(arrayBuffer));
     } catch (error: any) {
       if (error.message?.startsWith('IP_MISMATCH:')) {
         const expectedIp = error.message.split(':')[1];

@@ -220,10 +220,12 @@ export class ChallengeService {
         throw new Error(`IP_MISMATCH:${progress.started_ip}`);
       }
 
-      if (progress && isStartedAtPlaceholder(progress.challenge_started_at)) {
-        const nowStr = new Date().toISOString();
-        progress = await this.challengeRepo.updateStartedTimers(team_name.trim(), nowStr, clientIp, !progress.round_started_at || isStartedAtPlaceholder(progress.round_started_at));
-      }
+      const currentRoundCheck = rounds.find(r => r.order_number === currentRoundOrder);
+        const isRound1NotStarted = currentRoundCheck && currentRoundCheck.started_at === null && currentRoundCheck.order_number === 1;
+        if (!isRound1NotStarted && progress && isStartedAtPlaceholder(progress.challenge_started_at)) {
+          const nowStr = new Date().toISOString();
+          progress = await this.challengeRepo.updateStartedTimers(team_name.trim(), nowStr, clientIp, !progress.round_started_at || isStartedAtPlaceholder(progress.round_started_at));
+        }
     }
 
     return challenges.map((item) => {
@@ -305,10 +307,14 @@ export class ChallengeService {
     }
 
     const isLocked = challenge.order_number > currentOrder;
-    if (!isLocked && team_name && team_name.trim() && progress && isStartedAtPlaceholder(progress.challenge_started_at) && challenge.order_number === currentOrder) {
-      const nowStr = new Date().toISOString();
-      progress = await this.challengeRepo.updateStartedTimers(team_name.trim(), nowStr, clientIp, !progress.round_started_at || isStartedAtPlaceholder(progress.round_started_at));
-    }
+    const _allRounds = await this.challengeRepo.getRounds();
+      const _myRoundOrder2 = this.getCurrentRoundOrder(currentOrder, await this.challengeRepo.getAllChallengesAdmin(), _allRounds);
+      const _myRoundCheck2 = _allRounds.find(r => r.order_number === _myRoundOrder2);
+      const _isRound1NotStarted2 = _myRoundCheck2 && _myRoundCheck2.started_at === null && _myRoundCheck2.order_number === 1;
+      if (!_isRound1NotStarted2 && !isLocked && team_name && team_name.trim() && progress && isStartedAtPlaceholder(progress.challenge_started_at) && challenge.order_number === currentOrder) {
+        const nowStr = new Date().toISOString();
+        progress = await this.challengeRepo.updateStartedTimers(team_name.trim(), nowStr, clientIp, !progress.round_started_at || isStartedAtPlaceholder(progress.round_started_at));
+      }
     if (isLocked) {
       return {
         id: challenge.id,
@@ -438,7 +444,11 @@ export class ChallengeService {
     // so a wrong key (even for an already-solved challenge) still fails.
     const alreadyCompleted = existingProgress?.completed_challenges?.includes(challenge.order_number) || false;
 
-    if (!alreadyCompleted && existingProgress && isStartedAtPlaceholder(existingProgress.challenge_started_at)) {
+    const _myRoundOrder = this.getCurrentRoundOrder(currentUnlockedOrder, allChallenges, rounds);
+    const _myRoundCheck = rounds.find(r => r.order_number === _myRoundOrder);
+    const _isRound1NotStartedSub = _myRoundCheck && _myRoundCheck.started_at === null && _myRoundCheck.order_number === 1;
+
+    if (!_isRound1NotStartedSub && !alreadyCompleted && existingProgress && isStartedAtPlaceholder(existingProgress.challenge_started_at)) {
       const nowStr = new Date().toISOString();
       existingProgress = await this.challengeRepo.updateStartedTimers(team_name.trim(), nowStr, clientIp, !existingProgress.round_started_at || isStartedAtPlaceholder(existingProgress.round_started_at));
     }
