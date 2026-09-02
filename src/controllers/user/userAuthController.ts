@@ -136,6 +136,21 @@ export class UserAuthController {
         return;
       }
 
+      // Auto-sync session token if missing or expired (e.g. user authenticated via Supabase JWT on refresh)
+      const currentToken = getCookie(req, 'session_token');
+      if (!currentToken || !activeSessions.has(currentToken)) {
+        const sessionToken = require('crypto').randomBytes(32).toString('hex');
+        const expiresAt = Date.now() + SESSION_TTL_MS;
+        activeSessions.set(sessionToken, { email: user.email, expiresAt });
+        res.cookie('session_token', sessionToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+          maxAge: SESSION_TTL_MS,
+          path: '/',
+        });
+      }
+
       let teamName: string | null = null;
       let inviteCode: string | null = null;
       if (user.team_id) {
