@@ -381,6 +381,11 @@ export class ChallengeService {
 
     // Fetch team progress to check current unlocked challenge order
     let existingProgress = await this.challengeRepo.getTeamProgress(team_name.trim());
+    const [allChallenges, rounds] = await Promise.all([
+      this.challengeRepo.getPublicChallenges(),
+      this.challengeRepo.getRounds(),
+    ]);
+    existingProgress = await this.enforceRoundTimeout(team_name.trim(), existingProgress, allChallenges, rounds);
 
     // IP Tracking mismatch check
     if (isIpTrackingEnabled() && existingProgress && existingProgress.started_ip && clientIp && existingProgress.started_ip !== clientIp) {
@@ -410,6 +415,16 @@ export class ChallengeService {
       };
     }
 
+    const allRoundsCheck = await this.challengeRepo.getRounds();
+    const currentRoundCheck = allRoundsCheck.find(r => r.id === challenge.round_id);
+    if (currentRoundCheck && currentRoundCheck.is_paused) {
+      return {
+        success: false,
+        message: 'This round is currently paused by the Admin. No submissions can be accepted until it is resumed.',
+        tryAgain: false,
+      };
+    }
+
     // Bug Fix: If they already solved this challenge, don't update Leaderboard time (which ruins their tie-breaker rank)
     // NOTE: This is no longer a short-circuit — the answer is still validated below,
     // so a wrong key (even for an already-solved challenge) still fails.
@@ -420,34 +435,7 @@ export class ChallengeService {
       existingProgress = await this.challengeRepo.updateStartedTimers(team_name.trim(), nowStr, clientIp, !existingProgress.round_started_at || isStartedAtPlaceholder(existingProgress.round_started_at));
     }
 
-    // Verify time limit/timeout (only for the challenge the team is currently on)
-    if (!alreadyCompleted && existingProgress && existingProgress.challenge_started_at && !isStartedAtPlaceholder(existingProgress.challenge_started_at)) {
-      const startedAt = new Date(existingProgress.challenge_started_at).getTime();
-      const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
-      const limit = challenge.time_limit !== undefined ? challenge.time_limit : 1800;
-      if (elapsedSeconds > limit) {
-        // TIME LIMIT EXCEEDED: Auto-skip to next challenge without awarding points
-        // This prevents the team from being permanently soft-locked forever.
-        const nextChallengeOrder = await this.getTrueNextOrder(challenge.order_number);
-        const currentOrder = Math.max(currentUnlockedOrder, nextChallengeOrder);
-        
-        await this.challengeRepo.upsertTeamProgress(
-          team_name.trim(),
-          currentOrder,
-          existingProgress?.completed_challenges || []
-        );
 
-        const roundFragment = await this.getRoundEntryFragment(nextChallengeOrder, challenge.round_id);
-
-        return {
-          success: false,
-          message: 'Time Limit Exceeded. You have been moved to the next challenge without points.',
-          tryAgain: false,
-          unlocked_next_challenge: currentOrder,
-          story_fragment: roundFragment,
-        };
-      }
-    }
 
     // Strict Sequential Lock Rule: Team cannot attempt challenge N if N > currentUnlockedOrder
     if (challenge.order_number > currentUnlockedOrder) {
@@ -534,18 +522,51 @@ export class ChallengeService {
 
     const totalPoints = completedArray.length * 100;
 
-    // 1. Update Leaderboard FIRST (ensures team exists in leaderboard table satisfying FK)
+    // 1. Update Leaderboard FIRST
     await this.leaderboardRepo.setScoreByName(
       team_name.trim(),
       totalPoints,
       new Date().toISOString()
     );
 
+    // Calculate Round Crossover & Time Rollover
+    let newBonusSeconds = existingProgress?.round_bonus_seconds || 0;
+    let newRoundStartedAt = undefined;
+    
+    const allChallengesAdmin = await this.challengeRepo.getAllChallengesAdmin();
+    const allRounds = await this.challengeRepo.getRounds();
+    
+    const nextChallenge = allChallengesAdmin.find(c => c.order_number === nextChallengeOrder);
+    
+    if (nextChallenge && nextChallenge.round_id !== challenge.round_id) {
+       // Crossover!
+       const currentRoundForBonus = allRounds.find(r => r.id === challenge.round_id);
+       if (currentRoundForBonus && currentRoundForBonus.time_limit && existingProgress?.round_started_at) {
+          const roundStartedAt = new Date(existingProgress.round_started_at).getTime();
+          const limitSeconds = currentRoundForBonus.time_limit * 60;
+          const elapsedSeconds = Math.floor((Date.now() - roundStartedAt) / 1000);
+          const allowedTime = limitSeconds + newBonusSeconds;
+          
+          let timeRemaining = allowedTime - elapsedSeconds;
+          
+          if (timeRemaining > 0) {
+              newBonusSeconds = timeRemaining;
+          } else {
+              newBonusSeconds = 0;
+          }
+       }
+       
+       newRoundStartedAt = new Date().toISOString();
+    }
+
     // 2. Update Team Progress SECOND
     await this.challengeRepo.upsertTeamProgress(
       team_name.trim(),
       currentOrder,
-      completedArray
+      completedArray,
+      undefined,
+      newRoundStartedAt,
+      newBonusSeconds
     );
 
     const roundFragment = await this.getRoundEntryFragment(nextChallengeOrder, challenge.round_id);
@@ -561,6 +582,139 @@ export class ChallengeService {
   /**
    * Participant Resume & Progress: Returns current state so user continues seamlessly after logout
    */
+    public async shiftRoundTimers(round_order: number, pauseDurationMs: number): Promise<void> {
+    const allProgress = await this.challengeRepo.getAllTeamsProgressAdmin();
+    const allChallenges = await this.challengeRepo.getAllChallengesAdmin();
+    const allRounds = await this.challengeRepo.getRounds();
+    
+    // Convert ms to seconds
+    const pauseDurationSeconds = Math.floor(pauseDurationMs / 1000);
+    if (pauseDurationSeconds <= 0) return;
+    
+    for (const p of allProgress) {
+        const currentRoundOrder = this.getCurrentRoundOrder(p.current_challenge_order, allChallenges, allRounds);
+        if (currentRoundOrder === round_order) {
+            // Shift their bonus seconds instead of started_at!
+            const newBonus = (p.round_bonus_seconds || 0) + pauseDurationSeconds;
+            
+            await this.challengeRepo.upsertTeamProgress(
+                p.team_name,
+                p.current_challenge_order,
+                typeof p.completed_challenges === 'string' ? JSON.parse(p.completed_challenges) : (p.completed_challenges || []),
+                undefined,
+                p.round_started_at,
+                newBonus
+            );
+        }
+    }
+  }
+
+  
+    
+  public async resetCicadaEvent(): Promise<void> {
+    const allRounds = await this.challengeRepo.getRounds();
+    for (const r of allRounds) {
+        await this.updateRound(r.id, { started_at: null, is_paused: false, paused_at: null } as any);
+    }
+    const allProgress = await this.challengeRepo.getAllTeamsProgressAdmin();
+    for (const p of allProgress) {
+        await this.challengeRepo.upsertTeamProgress(
+            p.team_name,
+            1, // Reset to challenge 1
+            [], // Reset completed challenges
+            undefined,
+            null, // Clear started_at
+            0 // Clear bonus
+        );
+    }
+  }
+
+  public async pauseCicadaEvent(): Promise<void> {
+    const allRounds = await this.challengeRepo.getRounds();
+    const nowStr = new Date().toISOString();
+    for (const r of allRounds) {
+        await this.updateRound(r.id, { is_paused: true, paused_at: nowStr } as any);
+    }
+  }
+
+  public async resumeCicadaEvent(): Promise<void> {
+    const allRounds = await this.challengeRepo.getRounds();
+    for (const r of allRounds) {
+        if (r.is_paused && r.paused_at) {
+            const pausedAt = new Date(r.paused_at).getTime();
+            const pauseDurationMs = Date.now() - pausedAt;
+            await this.shiftRoundTimers(r.order_number, pauseDurationMs);
+            await this.updateRound(r.id, { is_paused: false, paused_at: null } as any);
+        }
+    }
+  }
+
+  public async startCicadaEvent(): Promise<void> {
+    const allProgress = await this.challengeRepo.getAllTeamsProgressAdmin();
+    const nowStr = new Date().toISOString();
+    
+    // Mark Round 1 as started globally just as a flag
+    const allRounds = await this.challengeRepo.getRounds();
+    const r1 = allRounds.find(r => r.order_number === 1);
+    if (r1) {
+       await this.updateRound(r1.id, { started_at: nowStr, is_paused: false, paused_at: null } as any);
+    }
+    
+    // Set round_started_at for all teams currently in Round 1 (or all teams)
+    for (const p of allProgress) {
+        if (!p.round_started_at || p.round_started_at === '1970-01-01T00:00:00.000Z' || this.getCurrentRoundOrder(p.current_challenge_order, await this.challengeRepo.getAllChallengesAdmin(), await this.challengeRepo.getRounds()) === 1) {
+            await this.challengeRepo.upsertTeamProgress(
+                p.team_name,
+                p.current_challenge_order,
+                typeof p.completed_challenges === 'string' ? JSON.parse(p.completed_challenges) : (p.completed_challenges || []),
+                undefined,
+                nowStr,
+                0 // reset bonus seconds
+            );
+        }
+    }
+  }
+
+    private async enforceRoundTimeout(team_name: string, progress: any, allChallenges: any[], allRounds: any[]): Promise<any> {
+    if (!progress || !progress.round_started_at || progress.round_started_at === '1970-01-01T00:00:00.000Z') {
+        return progress;
+    }
+    const currentRoundOrder = this.getCurrentRoundOrder(progress.current_challenge_order, allChallenges, allRounds);
+    const currentRound = allRounds.find(r => r.order_number === currentRoundOrder);
+    
+    if (currentRound && currentRound.time_limit > 0) {
+        const roundStartedAt = new Date(progress.round_started_at).getTime();
+        let elapsedSeconds = Math.floor((Date.now() - roundStartedAt) / 1000);
+        
+        if (currentRound.is_paused && currentRound.paused_at) {
+            elapsedSeconds = Math.floor((new Date(currentRound.paused_at).getTime() - roundStartedAt) / 1000);
+        }
+        
+        const limitSeconds = (currentRound.time_limit * 60) + (progress.round_bonus_seconds || 0);
+        
+        if (elapsedSeconds > limitSeconds) {
+            // TIME OUT! Auto-advance to the FIRST challenge of the NEXT round!
+            const nextRound = allRounds.find(r => r.order_number === currentRoundOrder + 1);
+            if (nextRound) {
+                const nextRoundChallenges = allChallenges.filter(c => c.round_id === nextRound.id).sort((a, b) => a.order_number - b.order_number);
+                if (nextRoundChallenges.length > 0) {
+                    const nextOrder = nextRoundChallenges[0].order_number;
+                    const newProgress = await this.challengeRepo.upsertTeamProgress(
+                        team_name,
+                        nextOrder,
+                        typeof progress.completed_challenges === 'string' ? JSON.parse(progress.completed_challenges) : (progress.completed_challenges || []),
+                        undefined,
+                        new Date().toISOString(), // Start timer for the next round immediately
+                        0 // Reset bonus
+                    );
+                    return newProgress;
+                }
+            }
+        }
+    }
+    return progress;
+  }
+
   public async getParticipantProgress(team_name: string): Promise<ParticipantProgress> {
     if (!team_name || !team_name.trim()) {
       throw new Error('Team name is required');
@@ -590,7 +744,9 @@ export class ChallengeService {
       current_round_order: currentRoundOrder,
       completed_challenges: completedOrders,
       challenges_solved: completedOrders.length,
-      unlocked_story_fragments: unlockedFragments,
+        round_bonus_seconds: progress?.round_bonus_seconds || 0,
+        round_started_at: progress?.round_started_at || null,
+        unlocked_story_fragments: unlockedFragments,
     };
   }
 

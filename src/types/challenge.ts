@@ -20,6 +20,9 @@ export interface Round {
   order_number: number;
   story_fragment?: StoryFragment | null;
   time_limit: number;
+  started_at?: string | null;
+  is_paused?: boolean;
+  paused_at?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -31,6 +34,9 @@ export interface RoundPublic {
   order_number: number;
   story_fragment?: StoryFragment | null;
   time_limit: number;
+  started_at?: string | null;
+  is_paused?: boolean;
+  paused_at?: string | null;
   is_active: boolean;
   is_locked?: boolean;
   created_at: string;
@@ -50,6 +56,9 @@ export interface UpdateRoundDto {
   order_number?: number;
   story_fragment?: StoryFragment;
   time_limit?: number;
+  started_at?: string | null;
+  is_paused?: boolean;
+  paused_at?: string | null;
   is_active?: boolean;
 }
 
@@ -118,6 +127,8 @@ export interface ParticipantProgress {
   current_round_order: number;
   completed_challenges: number[];
   challenges_solved: number;
+  round_bonus_seconds: number;
+  round_started_at?: string | null;
   unlocked_story_fragments: Array<{
     round_order: number;
     round_name: string;
