@@ -22,10 +22,17 @@ router.get('/rounds', AdminChallengeController.getRounds);
 router.post('/rounds', AdminChallengeController.createRound);
 router.post('/rounds/reorder', AdminChallengeController.reorderRounds);
 router.put('/rounds/:id', AdminChallengeController.updateRound);
+router.post('/rounds/:id/start', AdminChallengeController.startRound);
+  router.post('/rounds/:id/pause', AdminChallengeController.pauseRound);
+  router.post('/rounds/:id/resume', AdminChallengeController.resumeRound);
 router.delete('/rounds/:id', AdminChallengeController.deleteRound);
 
 // Round Timer routes (duration + start/reset, persisted to app_settings)
-router.get('/round-timer', AdminChallengeController.getRoundTimer);
+router.post('/start-cicada', AdminChallengeController.startCicada);
+  router.post('/reset-cicada', AdminChallengeController.resetCicada);
+  router.post('/pause-cicada', AdminChallengeController.pauseCicada);
+  router.post('/resume-cicada', AdminChallengeController.resumeCicada);
+  router.get('/round-timer', AdminChallengeController.getRoundTimer);
 router.post('/round-timer', AdminChallengeController.updateRoundTimer);
 
 // Hint Management routes pointing to the challenge

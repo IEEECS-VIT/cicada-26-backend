@@ -713,6 +713,78 @@ export class AdminChallengeController {
   }
 
   /**
+   * POST /api/admin/challenges/rounds/:id/start
+   */
+  static async startRound(req: Request, res: Response): Promise<void> {
+    try {
+      const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      if (!rawId) {
+        res.status(400).json({ success: false, error: 'Round ID is required' });
+        return;
+      }
+      const id: string = rawId;
+      const started_at = new Date().toISOString();
+      const data = await challengeService.updateRound(id, { started_at });
+      
+      await logAdminActivity(req, 'START_ROUND', { round_id: id, started_at });
+      
+      res.status(200).json({
+        success: true,
+        message: 'Round started successfully',
+        data,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message || 'Failed to start round' });
+    }
+  }
+
+  /**
+   * POST /api/admin/challenges/rounds/:id/pause
+   */
+  static async pauseRound(req: Request, res: Response): Promise<void> {
+    try {
+      const id = (Array.isArray(req.params.id) ? req.params.id[0] : req.params.id) as string;
+      const data = await challengeService.updateRound(id, { 
+          is_paused: true, 
+          paused_at: new Date().toISOString() 
+      });
+      await logAdminActivity(req, 'PAUSE_ROUND', { round_id: id });
+      res.status(200).json({ success: true, message: 'Round paused', data });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  /**
+   * POST /api/admin/challenges/rounds/:id/resume
+   */
+  static async resumeRound(req: Request, res: Response): Promise<void> {
+    try {
+      const id = (Array.isArray(req.params.id) ? req.params.id[0] : req.params.id) as string;
+      const rounds = await challengeService.getRoundsAdmin();
+      const round = rounds.find(r => r.id === id);
+      
+      if (round && round.is_paused && round.paused_at) {
+          const pausedAt = new Date(round.paused_at).getTime();
+          const now = Date.now();
+          const pauseDurationMs = now - pausedAt;
+          
+          // Shift team timers via service method
+          await challengeService.shiftRoundTimers(round.order_number, pauseDurationMs);
+      }
+      
+      const data = await challengeService.updateRound(id, { 
+          is_paused: false, 
+          paused_at: null 
+      });
+      await logAdminActivity(req, 'RESUME_ROUND', { round_id: id });
+      res.status(200).json({ success: true, message: 'Round resumed', data });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  /**
    * PUT /api/admin/rounds/:id
    */
   static async updateRound(req: Request, res: Response): Promise<void> {
@@ -723,7 +795,9 @@ export class AdminChallengeController {
         return;
       }
       const id: string = rawId;
+      console.log("updateRound req.body:", req.body);
       const validatedData = updateRoundSchema.parse(req.body);
+      console.log("updateRound validatedData:", validatedData);
       const data = await challengeService.updateRound(id, validatedData as any);
 
       if (!data) {
@@ -827,6 +901,52 @@ export class AdminChallengeController {
    * Set the round duration and/or start/reset the countdown. Persisted to
    * app_settings so the countdown survives page reloads and server restarts.
    */
+  
+  /**
+   * POST /api/admin/challenges/start-cicada
+   */
+  
+  
+  static async resetCicada(req: Request, res: Response): Promise<void> {
+    try {
+      await challengeService.resetCicadaEvent();
+      await logAdminActivity(req, 'RESET_CICADA', {});
+      res.status(200).json({ success: true, message: 'Cicada Event Reset! All timers and progress cleared.' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  static async pauseCicada(req: Request, res: Response): Promise<void> {
+    try {
+      await challengeService.pauseCicadaEvent();
+      await logAdminActivity(req, 'PAUSE_CICADA', {});
+      res.status(200).json({ success: true, message: 'Cicada Event Paused!' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  static async resumeCicada(req: Request, res: Response): Promise<void> {
+    try {
+      await challengeService.resumeCicadaEvent();
+      await logAdminActivity(req, 'RESUME_CICADA', {});
+      res.status(200).json({ success: true, message: 'Cicada Event Resumed!' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  static async startCicada(req: Request, res: Response): Promise<void> {
+    try {
+      await challengeService.startCicadaEvent();
+      await logAdminActivity(req, 'START_CICADA', {});
+      res.status(200).json({ success: true, message: 'Cicada Event Started! All Round 1 timers have begun.' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
   static async updateRoundTimer(req: Request, res: Response): Promise<void> {
     try {
       const validatedData = updateRoundTimerSchema.parse(req.body);
