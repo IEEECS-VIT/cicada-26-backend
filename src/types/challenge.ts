@@ -151,6 +151,7 @@ export interface SubmitAnswerResult {
   unlocked_next_challenge?: number | null;
   story_fragment?: StoryFragment | null;
   already_solved?: boolean;
+  time_expired?: boolean;
 }
 
 export interface AdminOverrideDto {
