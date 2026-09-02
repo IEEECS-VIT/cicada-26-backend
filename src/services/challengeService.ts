@@ -425,6 +425,14 @@ export class ChallengeService {
       };
     }
 
+    if (currentRoundCheck && currentRoundCheck.started_at === null && currentRoundCheck.order_number === 1) {
+      return {
+        success: false,
+        message: 'Round not started yet.',
+        tryAgain: false,
+      };
+    }
+
     // Bug Fix: If they already solved this challenge, don't update Leaderboard time (which ruins their tie-breaker rank)
     // NOTE: This is no longer a short-circuit — the answer is still validated below,
     // so a wrong key (even for an already-solved challenge) still fails.
@@ -781,8 +789,7 @@ export class ChallengeService {
     for (const prog of progressList) {
       const lbEntry = leaderboardMap.get(prog.team_name);
       const solvedCount = prog.completed_challenges.length;
-      const roundOfTeam = this.getRoundForOrder(prog.current_challenge_order, allChallenges, rounds);
-      const roundsEntered = roundOfTeam?.order_number ?? 1;
+      const roundsEntered = this.getCurrentRoundOrder(prog.current_challenge_order, allChallenges, rounds);
 
       summaryMap.set(prog.team_name, {
         team_name: prog.team_name,
