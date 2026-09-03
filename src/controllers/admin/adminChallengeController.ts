@@ -1,51 +1,14 @@
-import multer from 'multer';
-import { Request, Response, RequestHandler } from 'express';
+import { Request, Response } from 'express';
 import { z } from 'zod';
 import { challengeService } from '../../services/challengeService.js';
 import { logAdminActivity } from '../../services/auditLogger.js';
 import { ChallengeAsset } from '../../types/challenge.js';
-import db from '../../db.js';
-import r2Storage from '../../services/r2Storage.js';
 import {
   getRoundTimerConfig,
   setRoundDurationSeconds,
   startRound,
   resetRoundTimer,
 } from '../../services/roundTimerService.js';
-
-const ASSET_UPLOAD_MAX_BYTES = 20 * 1024 * 1024; // 20MB, matches MAX_ASSET_BYTES in userChallengeController
-
-const assetUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: ASSET_UPLOAD_MAX_BYTES },
-});
-
-const sanitizeFilename = (rawName: string): string => {
-  const base = rawName.replace(/\.\.+/g, '.').replace(/[\\/]/g, '_');
-  return base.replace(/\s+/g, '_').replace(/[^\w.\-]+/g, '').slice(0, 128) || 'asset';
-};
-
-const mimeTypeToAssetType = (mime: string): Exclude<ChallengeAsset['type'], undefined> => {
-  if (mime.startsWith('image/')) return 'image';
-  if (mime === 'application/pdf') return 'pdf';
-  if (mime.startsWith('audio/')) return 'audio';
-  if (mime.startsWith('video/')) return 'video';
-  return 'file';
-};
-
-export const uploadAssetFile: RequestHandler = (req, res, next) => {
-  assetUpload.single('file')(req, res, (err: any) => {
-    if (err) {
-      if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
-        res.status(413).json({ success: false, error: 'File is too large. Maximum size is 20MB.' });
-      } else {
-        res.status(400).json({ success: false, error: `Upload failed: ${err?.message || err}` });
-      }
-      return;
-    }
-    next();
-  });
-};
 
 const assetSchema = z.object({
   id: z.string().optional(),
@@ -591,91 +554,6 @@ export class AdminChallengeController {
   }
 
   /**
-   * POST /api/admin/challenges/:id/assets/upload
-   * Upload a file to R2 (multipart form-data, field "file") and attach it as
-   * an asset to a challenge. URL-based adds still go through POST /assets.
-   */
-  static async uploadAsset(req: Request, res: Response): Promise<void> {
-    try {
-      const challengeId = req.params.id;
-      if (!challengeId) {
-        res.status(400).json({ success: false, error: 'Challenge ID is required' });
-        return;
-      }
-
-      const file = (req as any).file as Express.Multer.File | undefined;
-      if (!file || !file.buffer || file.buffer.length === 0) {
-        res.status(400).json({ success: false, error: 'No file uploaded. Use multipart form-data with a "file" field.' });
-        return;
-      }
-      if (file.buffer.length > ASSET_UPLOAD_MAX_BYTES) {
-        res.status(413).json({ success: false, error: 'File is too large. Maximum size is 20MB.' });
-        return;
-      }
-
-      const fileName = sanitizeFilename(file.originalname || 'asset');
-      const key = `challenges/${challengeId}/${Date.now()}_${fileName}`;
-      const url = await r2Storage.upload({ key, body: file.buffer, contentType: file.mimetype });
-
-      const asset: Omit<ChallengeAsset, 'id'> & { id?: string } = {
-        type: mimeTypeToAssetType(file.mimetype),
-        name: file.originalname || fileName,
-        url,
-      };
-
-      const assets = await challengeService.addAssetToChallenge(String(challengeId), asset);
-
-      await logAdminActivity(req, 'ADD_CHALLENGE_ASSET', { challenge_id: String(challengeId), type: asset.type, name: asset.name });
-
-      res.status(201).json({
-        success: true,
-        message: 'Asset uploaded successfully',
-        data: assets,
-      });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message || 'Failed to upload asset' });
-    }
-  }
-
-  /**
-   * POST /api/admin/assets/upload
-   * Upload a file to R2 (multipart form-data, field "file") without attaching
-   * it to a challenge yet. Used by the challenge-creation flow, where assets
-   * are collected before the challenge exists and included in the create payload.
-   */
-  static async uploadStandaloneAsset(req: Request, res: Response): Promise<void> {
-    try {
-      const file = (req as any).file as Express.Multer.File | undefined;
-      if (!file || !file.buffer || file.buffer.length === 0) {
-        res.status(400).json({ success: false, error: 'No file uploaded. Use multipart form-data with a "file" field.' });
-        return;
-      }
-      if (file.buffer.length > ASSET_UPLOAD_MAX_BYTES) {
-        res.status(413).json({ success: false, error: 'File is too large. Maximum size is 20MB.' });
-        return;
-      }
-
-      const fileName = sanitizeFilename(file.originalname || 'asset');
-      const key = `challenges/uploads/${Date.now()}_${fileName}`;
-      const url = await r2Storage.upload({ key, body: file.buffer, contentType: file.mimetype });
-
-      await logAdminActivity(req, 'UPLOAD_ASSET', { key });
-
-      res.status(201).json({
-        success: true,
-        message: 'Asset uploaded successfully',
-        data: {
-          name: file.originalname || fileName,
-          type: mimeTypeToAssetType(file.mimetype),
-          url,
-        },
-      });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message || 'Failed to upload asset' });
-    }
-  }
-
-  /**
    * PUT /api/admin/challenges/:id/assets/:assetId
    * Edit/Replace an asset in a challenge
    */
@@ -721,18 +599,7 @@ export class AdminChallengeController {
         res.status(400).json({ success: false, error: 'Challenge ID and Asset ID are required' });
         return;
       }
-
-      let r2Key: string | null = null;
-      const fullChallenge = await db.challenges.findById(String(challengeId)) as any;
-      const assetToDelete = fullChallenge?.assets?.find((a: any) => a.id === assetId);
-      if (assetToDelete?.url) {
-        r2Key = r2Storage.extractKeyFromPublicUrl(assetToDelete.url);
-      }
-
       const assets = await challengeService.deleteAssetFromChallenge(String(challengeId), String(assetId));
-      if (r2Key) {
-        await r2Storage.delete(r2Key);
-      }
 
       await logAdminActivity(req, 'DELETE_CHALLENGE_ASSET', { challenge_id: String(challengeId), asset_id: String(assetId) });
 

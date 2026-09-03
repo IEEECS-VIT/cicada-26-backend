@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { AdminChallengeController, uploadAssetFile } from '../../controllers/admin/adminChallengeController.js';
+import { AdminChallengeController } from '../../controllers/admin/adminChallengeController.js';
 import { requireAdmin } from '../../middleware/authMiddleware.js';
 
 const router = Router();
@@ -23,19 +23,17 @@ router.post('/rounds', AdminChallengeController.createRound);
 router.post('/rounds/reorder', AdminChallengeController.reorderRounds);
 router.put('/rounds/:id', AdminChallengeController.updateRound);
 router.post('/rounds/:id/start', AdminChallengeController.startRound);
-router.post('/rounds/:id/pause', AdminChallengeController.pauseRound);
-router.post('/rounds/:id/resume', AdminChallengeController.resumeRound);
+  router.post('/rounds/:id/pause', AdminChallengeController.pauseRound);
+  router.post('/rounds/:id/resume', AdminChallengeController.resumeRound);
 router.delete('/rounds/:id', AdminChallengeController.deleteRound);
 
-// Global Event Control routes (start/pause/resume/reset the whole cicada)
-router.post('/start-cicada', AdminChallengeController.startCicada);
-router.post('/reset-cicada', AdminChallengeController.resetCicada);
-router.post('/pause-cicada', AdminChallengeController.pauseCicada);
-router.post('/resume-cicada', AdminChallengeController.resumeCicada);
-
 // Round Timer routes (duration + start/reset, persisted to app_settings)
+router.post('/start-cicada', AdminChallengeController.startCicada);
+  router.post('/reset-cicada', AdminChallengeController.resetCicada);
+  router.post('/pause-cicada', AdminChallengeController.pauseCicada);
+  router.post('/resume-cicada', AdminChallengeController.resumeCicada);
+  router.get('/round-timer', AdminChallengeController.getRoundTimer);
 router.post('/round-timer', AdminChallengeController.updateRoundTimer);
-router.get('/round-timer', AdminChallengeController.getRoundTimer);
 
 // Hint Management routes pointing to the challenge
 router.post('/:id/hints', AdminChallengeController.addHint);
@@ -44,9 +42,7 @@ router.delete('/:id/hints/:hintId', AdminChallengeController.deleteHint);
 router.patch('/:id/hints/:hintId/toggle', AdminChallengeController.toggleHint);
 
 // Asset Management routes pointing to the challenge
-router.post('/assets/upload', uploadAssetFile, AdminChallengeController.uploadStandaloneAsset);
 router.post('/:id/assets', AdminChallengeController.addAsset);
-router.post('/:id/assets/upload', uploadAssetFile, AdminChallengeController.uploadAsset);
 router.put('/:id/assets/:assetId', AdminChallengeController.editAsset);
 router.delete('/:id/assets/:assetId', AdminChallengeController.deleteAsset);
 
