@@ -18,6 +18,7 @@ import godAuthRoutes from './routes/god/authRoutes.js';
 import godLogRoutes from './routes/god/logRoutes.js';
 
 const app: Express = express();
+app.set('trust proxy', 1);
 
 // ---------------------------------------------------------------------------
 // CORS - allow all origins in development
