@@ -28,6 +28,14 @@ const getAllowedAssetHosts = (): Set<string> => {
       // ignore malformed SUPABASE_URL
     }
   }
+  const r2PublicUrl = process.env.R2_PUBLIC_URL;
+  if (r2PublicUrl) {
+    try {
+      hosts.add(new URL(r2PublicUrl).hostname);
+    } catch {
+      // ignore malformed R2_PUBLIC_URL
+    }
+  }
   const extra = process.env.ASSET_ALLOWED_HOSTS;
   if (extra) {
     for (const h of extra.split(',')) {
