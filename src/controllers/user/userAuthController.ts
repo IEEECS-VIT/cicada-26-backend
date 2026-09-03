@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import db, { supabaseAnon } from '../../db.js';
-import { activeSessions, getCookie } from '../../middleware/authMiddleware.js';
+import { activeSessions, getCookie, createSignedSessionToken, verifySignedSessionToken } from '../../middleware/authMiddleware.js';
 
 const SESSION_TTL_MS = (parseInt(process.env.SESSION_TTL_MINUTES || '30', 10)) * 60 * 1000;
 
@@ -78,15 +78,13 @@ export class UserAuthController {
       const isAdmin = user.role === 'admin' || isGod;
 
       // Issue a server-side session token with TTL
-      const sessionToken = uuidv4();
-      const expiresAt = Date.now() + SESSION_TTL_MS;
-      activeSessions.set(sessionToken, { email, expiresAt });
+      const sessionToken = createSignedSessionToken(email);
 
       // Set HttpOnly cookie (not readable by JS)
       res.cookie('session_token', sessionToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        secure: process.env.NODE_ENV === 'production' || process.env.RENDER === 'true',
+        sameSite: (process.env.NODE_ENV === 'production' || process.env.RENDER === 'true') ? 'none' : 'lax',
         maxAge: SESSION_TTL_MS,
         path: '/',
       });
@@ -138,14 +136,12 @@ export class UserAuthController {
 
       // Auto-sync session token if missing or expired (e.g. user authenticated via Supabase JWT on refresh)
       const currentToken = getCookie(req, 'session_token');
-      if (!currentToken || !activeSessions.has(currentToken)) {
-        const sessionToken = require('crypto').randomBytes(32).toString('hex');
-        const expiresAt = Date.now() + SESSION_TTL_MS;
-        activeSessions.set(sessionToken, { email: user.email, expiresAt });
+        if (!currentToken || !verifySignedSessionToken(currentToken)) {
+          const sessionToken = createSignedSessionToken(user.email);
         res.cookie('session_token', sessionToken, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+          secure: process.env.NODE_ENV === 'production' || process.env.RENDER === 'true',
+          sameSite: (process.env.NODE_ENV === 'production' || process.env.RENDER === 'true') ? 'none' : 'lax',
           maxAge: SESSION_TTL_MS,
           path: '/',
         });

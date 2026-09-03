@@ -7,24 +7,36 @@ import db, { supabase, supabaseAnon } from '../db.js';
 // Used as HttpOnly cookie sessions so the Supabase JWT doesn't need to be
 // sent on every request after initial login.
 // ---------------------------------------------------------------------------
-interface SessionEntry {
-  email: string;
-  expiresAt: number; // Unix ms
-}
-
-export const activeSessions = new Map<string, SessionEntry>();
+import crypto from 'crypto';
 
 const SESSION_TTL_MS = (parseInt(process.env.SESSION_TTL_MINUTES || '30', 10)) * 60 * 1000;
+const COOKIE_SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY || 'fallback-secret-cicada-26';
 
-// Auto-purge expired sessions every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [token, entry] of activeSessions.entries()) {
-    if (now > entry.expiresAt) {
-      activeSessions.delete(token);
-    }
+export const createSignedSessionToken = (email: string): string => {
+  const expiresAt = Date.now() + SESSION_TTL_MS;
+  const data = `${email}|${expiresAt}`;
+  const signature = crypto.createHmac('sha256', COOKIE_SECRET).update(data).digest('hex');
+  return `${data}|${signature}`;
+};
+
+export const verifySignedSessionToken = (token: string | undefined): string | null => {
+  if (!token) return null;
+  try {
+    const parts = token.split('|');
+    if (parts.length !== 3) return null;
+    const [email, expStr, signature] = parts as [string, string, string];
+    const expiresAt = parseInt(expStr, 10);
+    if (Date.now() > expiresAt) return null;
+    const expectedSignature = crypto.createHmac('sha256', COOKIE_SECRET).update(`${email}|${expStr}`).digest('hex');
+    if (signature === expectedSignature) return email;
+  } catch (e) {
+    return null;
   }
-}, 5 * 60 * 1000);
+  return null;
+};
+
+// We will keep a mock activeSessions map so userAuthController.ts doesn't break compilation before we patch it
+export const activeSessions = new Map<string, any>();
 
 export const getCookie = (req: Request, name: string): string | undefined => {
   const cookieHeader = req.headers.cookie;
@@ -71,15 +83,15 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
     // 2. Server-issued HttpOnly session cookie
     const sessionToken = getCookie(req, 'session_token');
     if (sessionToken) {
-      const entry = activeSessions.get(sessionToken);
-      if (entry && Date.now() < entry.expiresAt) {
-        const dbUser = await db.users.findByEmail(entry.email);
+      const email = verifySignedSessionToken(sessionToken);
+      if (email) {
+        const dbUser = await db.users.findByEmail(email);
         if (dbUser) {
           (req as any).user = dbUser;
           return next();
         }
-      } else if (entry) {
-        activeSessions.delete(sessionToken); // expired — clean up
+      /*
+        */ // expired — clean up
       }
     }
 
@@ -90,11 +102,20 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
       const token = authHeader.split(' ')[1];
       const { data: { user: authUser }, error } = await supabaseAnon.auth.getUser(token);
       if (!error && authUser?.email) {
-        const dbUser = await db.users.findByEmail(authUser.email);
-        if (dbUser) {
-          (req as any).user = dbUser;
-          return next();
-        }
+                  const dbUser = await db.users.findByEmail(authUser.email);
+          if (dbUser) {
+            // AUTO-RENEW COOKIE TO PREVENT SUPABASE RATE LIMITS
+            const newSessionToken = createSignedSessionToken(authUser.email);
+            res.cookie('session_token', newSessionToken, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production' || process.env.RENDER === 'true',
+              sameSite: (process.env.NODE_ENV === 'production' || process.env.RENDER === 'true') ? 'none' : 'lax',
+              maxAge: SESSION_TTL_MS,
+              path: '/',
+            });
+            (req as any).user = dbUser;
+            return next();
+          }
       }
     }
   } catch (_) { /* fall through */ }
@@ -132,15 +153,13 @@ export const requireAdmin = async (req: Request, res: Response, next: NextFuncti
     // 2. Server session cookie (must be admin or GOD role)
     const sessionToken = getCookie(req, 'session_token');
     if (sessionToken) {
-      const entry = activeSessions.get(sessionToken);
-      if (entry && Date.now() < entry.expiresAt) {
-        const dbUser = await db.users.findByEmail(entry.email);
+      const email = verifySignedSessionToken(sessionToken);
+      if (email) {
+        const dbUser = await db.users.findByEmail(email);
         if (dbUser && (dbUser.role === 'admin' || dbUser.role === 'GOD')) {
           (req as any).user = dbUser;
           return next();
         }
-      } else if (entry) {
-        activeSessions.delete(sessionToken);
       }
     }
 
@@ -150,11 +169,19 @@ export const requireAdmin = async (req: Request, res: Response, next: NextFuncti
       const token = authHeader.split(' ')[1];
       const { data: { user: authUser } } = await supabase.auth.getUser(token);
       if (authUser?.email) {
-        const dbUser = await db.users.findByEmail(authUser.email);
-        if (dbUser && (dbUser.role === 'admin' || dbUser.role === 'GOD')) {
-          (req as any).user = dbUser;
-          return next();
-        }
+                  const dbUser = await db.users.findByEmail(authUser.email);
+          if (dbUser && (dbUser.role === 'admin' || dbUser.role === 'GOD')) {
+            const newSessionToken = createSignedSessionToken(authUser.email);
+            res.cookie('session_token', newSessionToken, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production' || process.env.RENDER === 'true',
+              sameSite: (process.env.NODE_ENV === 'production' || process.env.RENDER === 'true') ? 'none' : 'lax',
+              maxAge: SESSION_TTL_MS,
+              path: '/',
+            });
+            (req as any).user = dbUser;
+            return next();
+          }
       }
     }
   } catch (_) { /* fall through */ }
@@ -185,15 +212,13 @@ export const requireGod = async (req: Request, res: Response, next: NextFunction
     // 2. Server session cookie (must be GOD role)
     const sessionToken = getCookie(req, 'session_token');
     if (sessionToken) {
-      const entry = activeSessions.get(sessionToken);
-      if (entry && Date.now() < entry.expiresAt) {
-        const dbUser = await db.users.findByEmail(entry.email);
+      const email = verifySignedSessionToken(sessionToken);
+      if (email) {
+        const dbUser = await db.users.findByEmail(email);
         if (dbUser && dbUser.role === 'GOD') {
           (req as any).user = dbUser;
           return next();
         }
-      } else if (entry) {
-        activeSessions.delete(sessionToken);
       }
     }
 
@@ -203,11 +228,19 @@ export const requireGod = async (req: Request, res: Response, next: NextFunction
       const token = authHeader.split(' ')[1];
       const { data: { user: authUser } } = await supabase.auth.getUser(token);
       if (authUser?.email) {
-        const dbUser = await db.users.findByEmail(authUser.email);
-        if (dbUser && dbUser.role === 'GOD') {
-          (req as any).user = dbUser;
-          return next();
-        }
+                  const dbUser = await db.users.findByEmail(authUser.email);
+          if (dbUser && dbUser.role === 'GOD') {
+            const newSessionToken = createSignedSessionToken(authUser.email);
+            res.cookie('session_token', newSessionToken, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production' || process.env.RENDER === 'true',
+              sameSite: (process.env.NODE_ENV === 'production' || process.env.RENDER === 'true') ? 'none' : 'lax',
+              maxAge: SESSION_TTL_MS,
+              path: '/',
+            });
+            (req as any).user = dbUser;
+            return next();
+          }
       }
     }
   } catch (_) { /* fall through */ }
