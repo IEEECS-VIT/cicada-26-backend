@@ -8,8 +8,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PUPPETEER_SKIP_DOWNLOAD
-        value: "true"
+      - key: PORT
+        value: 5000
       - key: SUPABASE_URL
         value: https://fdzcrmwwjpfwntbakied.supabase.co
       - key: SUPABASE_ANON_KEY
