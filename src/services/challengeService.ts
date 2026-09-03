@@ -464,6 +464,27 @@ export class ChallengeService {
       };
     }
 
+    // ROUND TIME LIMIT: when the challenge belongs to a round with a time
+    // limit, the round clock is authoritative — submissions are REJECTED once
+    // the round's time has elapsed (no auto-skip).
+    if (!alreadyCompleted && challenge.round_id && existingProgress && existingProgress.round_started_at && !isStartedAtPlaceholder(existingProgress.round_started_at)) {
+      const round = await this.challengeRepo.getRoundByIdentifier(challenge.round_id);
+      const roundLimitSeconds = Math.max(0, Number(round?.time_limit || 0)) * 60;
+      if (roundLimitSeconds > 0) {
+        const roundStartedAt = new Date(existingProgress.round_started_at).getTime();
+        const roundElapsedSeconds = Math.floor((Date.now() - roundStartedAt) / 1000);
+        if (roundElapsedSeconds >= roundLimitSeconds) {
+          return {
+            success: false,
+            message: 'Round time expired. Submissions for this round are closed.',
+            tryAgain: false,
+            time_expired: true,
+            unlocked_next_challenge: currentUnlockedOrder,
+          };
+        }
+      }
+    }
+
     // Normalize comparison: trim leading/trailing spaces, case insensitive
     const normalizedSubmitted = answer.trim().toLowerCase();
       let isCorrect = false;
