@@ -5,7 +5,7 @@ import { challengeService } from '../../services/challengeService.js';
 import { logAdminActivity } from '../../services/auditLogger.js';
 import { ChallengeAsset } from '../../types/challenge.js';
 import db from '../../db.js';
-import r2Storage from '../../services/r2Storage.js';
+import s3Storage from '../../services/s3Storage.js';
 import {
   getRoundTimerConfig,
   setRoundDurationSeconds,
@@ -615,7 +615,7 @@ export class AdminChallengeController {
 
       const fileName = sanitizeFilename(file.originalname || 'asset');
       const key = `challenges/${challengeId}/${Date.now()}_${fileName}`;
-      const url = await r2Storage.upload({ key, body: file.buffer, contentType: file.mimetype });
+      const url = await s3Storage.upload({ key, body: file.buffer, contentType: file.mimetype });
 
       const asset: Omit<ChallengeAsset, 'id'> & { id?: string } = {
         type: mimeTypeToAssetType(file.mimetype),
@@ -657,7 +657,7 @@ export class AdminChallengeController {
 
       const fileName = sanitizeFilename(file.originalname || 'asset');
       const key = `challenges/uploads/${Date.now()}_${fileName}`;
-      const url = await r2Storage.upload({ key, body: file.buffer, contentType: file.mimetype });
+      const url = await s3Storage.upload({ key, body: file.buffer, contentType: file.mimetype });
 
       await logAdminActivity(req, 'UPLOAD_ASSET', { key });
 
@@ -722,16 +722,16 @@ export class AdminChallengeController {
         return;
       }
 
-      let r2Key: string | null = null;
+      let s3Key: string | null = null;
       const fullChallenge = await db.challenges.findById(String(challengeId)) as any;
       const assetToDelete = fullChallenge?.assets?.find((a: any) => a.id === assetId);
       if (assetToDelete?.url) {
-        r2Key = r2Storage.extractKeyFromPublicUrl(assetToDelete.url);
+        s3Key = s3Storage.extractKeyFromPublicUrl(assetToDelete.url);
       }
 
       const assets = await challengeService.deleteAssetFromChallenge(String(challengeId), String(assetId));
-      if (r2Key) {
-        await r2Storage.delete(r2Key);
+      if (s3Key) {
+        await s3Storage.delete(s3Key);
       }
 
       await logAdminActivity(req, 'DELETE_CHALLENGE_ASSET', { challenge_id: String(challengeId), asset_id: String(assetId) });

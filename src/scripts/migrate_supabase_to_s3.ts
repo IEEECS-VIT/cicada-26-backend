@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import r2Storage from '../services/r2Storage.js';
+import s3Storage from '../services/s3Storage.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -89,7 +89,7 @@ const main = async (): Promise<void> => {
 
       const body = Buffer.from(await dl.arrayBuffer());
       const mimetype = object.metadata?.mimetype || object.metadata?.contentType;
-      await r2Storage.upload({
+      await s3Storage.upload({
         key: object.key,
         body,
         ...(mimetype ? { contentType: mimetype } : {}),

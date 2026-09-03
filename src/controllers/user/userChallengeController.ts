@@ -28,12 +28,12 @@ const getAllowedAssetHosts = (): Set<string> => {
       // ignore malformed SUPABASE_URL
     }
   }
-  const r2PublicUrl = process.env.R2_PUBLIC_URL;
-  if (r2PublicUrl) {
+  const s3PublicUrl = process.env.S3_PUBLIC_URL;
+  if (s3PublicUrl) {
     try {
-      hosts.add(new URL(r2PublicUrl).hostname);
+      hosts.add(new URL(s3PublicUrl).hostname);
     } catch {
-      // ignore malformed R2_PUBLIC_URL
+      // ignore malformed S3_PUBLIC_URL
     }
   }
   const extra = process.env.ASSET_ALLOWED_HOSTS;
