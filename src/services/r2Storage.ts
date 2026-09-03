@@ -18,9 +18,11 @@ export class R2Storage {
     const bucket = process.env.R2_BUCKET_NAME;
 
     if (!accountId || !accessKeyId || !secretAccessKey || !bucket) {
-      throw new Error(
-        'R2 storage is not configured. Missing CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME env vars.'
-      );
+      console.warn('WARNING: R2 storage is not configured. Missing env vars. Asset uploads will fail, but server will start.');
+      this.bucket = bucket || '';
+      this.publicUrl = process.env.R2_PUBLIC_URL ? process.env.R2_PUBLIC_URL.replace(/\/+$/, '') : null;
+      this.client = null as any;
+      return;
     }
 
     this.bucket = bucket;
@@ -38,6 +40,7 @@ export class R2Storage {
    * or just the key if no public URL is configured.
    */
   public async upload(params: R2UploadParams): Promise<string> {
+    if (!this.client) throw new Error('R2 storage is not configured.');
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
@@ -54,6 +57,7 @@ export class R2Storage {
    * logged so that a DB row mutation is never blocked by storage cleanup.
    */
   public async delete(key: string): Promise<void> {
+    if (!this.client) return;
     try {
       await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
     } catch (err: any) {
