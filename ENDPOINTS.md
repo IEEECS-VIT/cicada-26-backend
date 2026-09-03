@@ -79,8 +79,6 @@ All incoming requests are evaluated by security middleware through four supporte
 | `DELETE`| `/api/admin/challenges/:id/hints/:hintId`| `requireAdmin`| Delete hint from challenge |
 | `PATCH`| `/api/admin/challenges/:id/hints/:hintId/toggle`| `requireAdmin`| Toggle hint visibility (`is_visible`) |
 | `POST` | `/api/admin/challenges/:id/assets`| `requireAdmin`| Add media asset to challenge |
-| `POST` | `/api/admin/challenges/:id/assets/upload`| `requireAdmin`| Upload file (multipart `file`) to R2 and add as asset |
-| `POST` | `/api/admin/challenges/assets/upload`| `requireAdmin`| Upload file (multipart `file`) to R2 without attaching (returns `{ name, type, url }`) |
 | `PUT` | `/api/admin/challenges/:id/assets/:assetId`| `requireAdmin`| Replace / edit asset in challenge |
 | `DELETE`| `/api/admin/challenges/:id/assets/:assetId`| `requireAdmin`| Delete asset from challenge |
 | `GET` | `/api/admin/challenges/ip-tracking`| `requireAdmin` | Check current IP tracking / location locking status |
@@ -754,10 +752,8 @@ All routes require `requireAdmin`.
 
 #### Asset Management Sub-Routes:
 - `POST /api/admin/challenges/:id/assets`: Add asset (`image`, `pdf`, `audio`, `video`, `file`, `text`).
-- `POST /api/admin/challenges/:id/assets/upload`: Upload a file to Cloudflare R2 (multipart form-data field `file`, max 20MB) and attach it to the challenge. Stores the file at `challenges/<challengeId>/<timestamp>_<filename>` on the R2 bucket and uses `R2_PUBLIC_URL` in the asset URL.
-- `POST /api/admin/challenges/assets/upload`: Upload a file to Cloudflare R2 (multipart form-data field `file`, max 20MB) without attaching it to a challenge (used by the challenge-creation flow). Stores the file at `challenges/uploads/<timestamp>_<filename>` and returns `{ name, type, url }`.
 - `PUT /api/admin/challenges/:id/assets/:assetId`: Edit asset.
-- `DELETE /api/admin/challenges/:id/assets/:assetId`: Delete asset (also deletes the object from R2 if the asset URL points at `R2_PUBLIC_URL`).
+- `DELETE /api/admin/challenges/:id/assets/:assetId`: Delete asset.
 
 #### IP Tracking & Location Lock Sub-Routes:
 - `GET /api/admin/challenges/ip-tracking` (and `/ip-blocking`): Returns whether Same-IP location locking middleware is active.
