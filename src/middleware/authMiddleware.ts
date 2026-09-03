@@ -102,11 +102,20 @@ export const requireAuth = async (req: Request, res: Response, next: NextFunctio
       const token = authHeader.split(' ')[1];
       const { data: { user: authUser }, error } = await supabaseAnon.auth.getUser(token);
       if (!error && authUser?.email) {
-        const dbUser = await db.users.findByEmail(authUser.email);
-        if (dbUser) {
-          (req as any).user = dbUser;
-          return next();
-        }
+                  const dbUser = await db.users.findByEmail(authUser.email);
+          if (dbUser) {
+            // AUTO-RENEW COOKIE TO PREVENT SUPABASE RATE LIMITS
+            const newSessionToken = createSignedSessionToken(authUser.email);
+            res.cookie('session_token', newSessionToken, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production' || process.env.RENDER === 'true',
+              sameSite: (process.env.NODE_ENV === 'production' || process.env.RENDER === 'true') ? 'none' : 'lax',
+              maxAge: SESSION_TTL_MS,
+              path: '/',
+            });
+            (req as any).user = dbUser;
+            return next();
+          }
       }
     }
   } catch (_) { /* fall through */ }
@@ -160,11 +169,19 @@ export const requireAdmin = async (req: Request, res: Response, next: NextFuncti
       const token = authHeader.split(' ')[1];
       const { data: { user: authUser } } = await supabase.auth.getUser(token);
       if (authUser?.email) {
-        const dbUser = await db.users.findByEmail(authUser.email);
-        if (dbUser && (dbUser.role === 'admin' || dbUser.role === 'GOD')) {
-          (req as any).user = dbUser;
-          return next();
-        }
+                  const dbUser = await db.users.findByEmail(authUser.email);
+          if (dbUser && (dbUser.role === 'admin' || dbUser.role === 'GOD')) {
+            const newSessionToken = createSignedSessionToken(authUser.email);
+            res.cookie('session_token', newSessionToken, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production' || process.env.RENDER === 'true',
+              sameSite: (process.env.NODE_ENV === 'production' || process.env.RENDER === 'true') ? 'none' : 'lax',
+              maxAge: SESSION_TTL_MS,
+              path: '/',
+            });
+            (req as any).user = dbUser;
+            return next();
+          }
       }
     }
   } catch (_) { /* fall through */ }
@@ -211,11 +228,19 @@ export const requireGod = async (req: Request, res: Response, next: NextFunction
       const token = authHeader.split(' ')[1];
       const { data: { user: authUser } } = await supabase.auth.getUser(token);
       if (authUser?.email) {
-        const dbUser = await db.users.findByEmail(authUser.email);
-        if (dbUser && dbUser.role === 'GOD') {
-          (req as any).user = dbUser;
-          return next();
-        }
+                  const dbUser = await db.users.findByEmail(authUser.email);
+          if (dbUser && dbUser.role === 'GOD') {
+            const newSessionToken = createSignedSessionToken(authUser.email);
+            res.cookie('session_token', newSessionToken, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production' || process.env.RENDER === 'true',
+              sameSite: (process.env.NODE_ENV === 'production' || process.env.RENDER === 'true') ? 'none' : 'lax',
+              maxAge: SESSION_TTL_MS,
+              path: '/',
+            });
+            (req as any).user = dbUser;
+            return next();
+          }
       }
     }
   } catch (_) { /* fall through */ }
